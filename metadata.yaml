@@ -1,6 +1,7 @@
 name: astrbot_plugin_maib50 # 插件唯一识别名，以 astrbot_plugin_ 前缀开头
-display_name: Maib50 INT. # 用于展示的名字，可以是方便人类阅读的名字（需要版本 >= v4.5.0，低版本不会报错，请放心填写）
+display_name: Maib50 国际服. # 用于展示的名字，可以是方便人类阅读的名字（需要版本 >= v4.5.0，低版本不会报错，请放心填写）
 desc: 为 AstrBot 提供国际服 Maib50 相关功能 # 插件简短描述
 version: v0.0.1 # 插件版本号。格式：v1.1.1 或者 v1.1
-author: Determination_X # 作者
+author: 诶嘿怪awa # 作者
 repo: https://github.com/Determination-X/astrbot_plugin_maib50 # 插件的仓库地址
+#astrbot_version: ">=4.9.2" # KV存储适配的 AstrBot 版本
