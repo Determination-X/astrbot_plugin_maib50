@@ -13,8 +13,9 @@ help_text = """
 ├─/mai help
 └─/mai search <关键词>
 
-服务器参数说明:
-INT: 国际服 CN: 国服 RIN: 日服 MUNET: MuNET"""
+可用服务器:  国际服
+开发中:  国服 Rin服 MuNET
+咕咕中: 日服"""
 
 @register("maib50", "Determination_X", "Maib50 国际服插件", "1.0.0")
 class MyPlugin(Star):
