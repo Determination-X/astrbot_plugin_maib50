@@ -44,7 +44,7 @@ class MyPlugin(Star):
         yield event.plain_result(help_text)
 
     @mai.command("bind")
-    async def mai_bind(self, event: AstrMessageEvent, server: str, friend_code: str):
+    async def mai_bind(self, event: AstrMessageEvent, server: str, friend_code: str=""):
         if server == "help" and friend_code == "":
             yield event.plain_result("""
 服务器参数说明:
