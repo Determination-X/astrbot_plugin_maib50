@@ -35,13 +35,16 @@ class MyPlugin(Star):
         yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
 
     @filter.command("mai")
+    async def mai_help_standalone(self, event: AstrMessageEvent):
+            yield event.plain_result(help_text)
+
 
     @filter.command_group("mai")
     async def mai(self, event: AstrMessageEvent):
         yield event.plain_result(help_text)
 
     @mai.command("help")
-    async def mai_help2(self, event: AstrMessageEvent):
+    async def mai_help(self, event: AstrMessageEvent):
         yield event.plain_result(help_text)
 
     @mai.command("bind")
