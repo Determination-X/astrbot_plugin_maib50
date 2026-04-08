@@ -34,12 +34,10 @@ class MyPlugin(Star):
         logger.info(message_chain)
         yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
 
+    @filter.command("mai")
+
     @filter.command_group("mai")
     async def mai(self, event: AstrMessageEvent):
-        yield event.plain_result(help_text)
-
-    @mai.command("")
-    async def mai_help(self, event: AstrMessageEvent):
         yield event.plain_result(help_text)
 
     @mai.command("help")
