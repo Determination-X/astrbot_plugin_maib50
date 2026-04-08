@@ -4,12 +4,11 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
 plugin_name = "astrbot_plugin_maib50"
-help_text = """
-/mai可用指令: 
+help_text = """/mai可用指令: 
 ├─/mai b50
 ├─/mai bind INT <好友码>
-│ /mai bind CN (开发中)
-│ /mai bind JP (暫定)
+│  /mai bind CN (开发中)
+│  /mai bind JP (暫定)
 ├─/mai help
 └─/mai search <关键词>
 
@@ -39,15 +38,18 @@ class MyPlugin(Star):
     async def mai(self, event: AstrMessageEvent):
         yield event.plain_result(help_text)
 
-    @mai.command("help")
+    @mai.command("")
     async def mai_help(self, event: AstrMessageEvent):
         yield event.plain_result(help_text)
 
+    @mai.command("help")
+    async def mai_help2(self, event: AstrMessageEvent):
+        yield event.plain_result(help_text)
+
     @mai.command("bind")
-    async def mai_bind(self, event: AstrMessageEvent, server: str, friend_code: str=""):
+    async def mai_bind(self, event: AstrMessageEvent, server: str="", friend_code: str=""):
         if server == "help" and friend_code == "":
-            yield event.plain_result("""
-服务器参数说明:
+            yield event.plain_result("""服务器可用参数说明:
 INT int 国际服 國際服 International
 CN  cn  国服 國服 China
 JP  jp  日服  Japan JPN jpn
