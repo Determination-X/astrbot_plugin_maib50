@@ -96,8 +96,26 @@ MUNET munet MuNET""")
             return
         yield event.plain_result(f"[DEBUG] SID= {bot_sid} , PASSWORD= {bot_password}")
 
-        
-        # code for image generation here
+        # Login using aiohttp
+        try:
+            async with aiohttp.ClientSession() as session:
+                data = {
+                    'retention': '1',
+                    'sid': bot_sid,
+                    'password': bot_password
+                }
+                async with session.post('https://lng-tgk-aime-gw.am-all.net/common_auth/login/sid', data=data, allow_redirects=False) as resp:
+                    if resp.status == 302:
+                        location = resp.headers.get('Location')
+                        if location and 'ssid=' in location:
+                            ssid = location.split('ssid=')[1].split('&')[0]
+                            yield event.plain_result(f"登录成功，SSID: {ssid}")
+                        else:
+                            yield event.plain_result("登录失败：未找到SSID")
+                    else:
+                        yield event.plain_result(f"登录失败：状态码 {resp.status}")
+        except Exception as e:
+            yield event.plain_result(f"登录出错：{str(e)}")
         # chain= [
         #     Comp.At(qq=event.get_sender_id()),
         #     Comp.Plain(" 你的B50来了喵~"),
