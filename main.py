@@ -82,7 +82,6 @@ MUNET munet MuNET""")
             self.conn.commit()
             yield event.plain_result(f"成功绑定国际服好友码 {friend_code} 喵！")
     
-    @filter.event_message_type(filter.EventMessageType.PRIVATE_MESSAGE)
     @filter.permission_type(filter.PermissionType.ADMIN)
     @mai.command("view-all-binds")
     async def mai_view_all_binds(self, event: AstrMessageEvent, force: str=""):
