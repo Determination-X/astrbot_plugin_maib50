@@ -2,7 +2,9 @@ from astrbot.api.event import filter, AstrMessageEvent
 import astrbot.api.message_components as Comp
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
-import aiohttp
+import aiohttp# 异步HTTP请求库，用于向maimai net爬取数据
+import os 
+import sqlite3 # 存储绑定信息的数据库
 
 plugin_name = "astrbot_plugin_maib50"
 help_text = """/mai可用指令: 
@@ -21,22 +23,33 @@ help_text = """/mai可用指令:
 class MaiPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        self.config = config# 获取插件配置，配置文件路径为 `data/plugin_data/astrbot_plugin_maib50/config.json`，如果没有这个文件会自动创建一个空的配置文件。可以在这个配置文件里添加一些插件需要的配置项。
+        self.config = config # 获取插件配置，配置文件路径为 `data/plugin_data/astrbot_plugin_maib50/config.json`，如果没有这个文件会自动创建一个空的配置文件。可以在这个配置文件里添加一些插件需要的配置项。
         self.sid = self.config.get("INT", {}).get("BOT_SID", "") # 从配置文件中获取 BOT_SID 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
         self.password = self.config.get("INT", {}).get("BOT_PASSWORD", "") # 从配置文件中获取 BOT_PASSWORD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
+        self.db_path = os.path.join("data", "plugin_data", plugin_name, "bindings.db")
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        self.conn = sqlite3.connect(self.db_path)
+        self.conn.execute('''CREATE TABLE IF NOT EXISTS bindings (
+            qq_id TEXT PRIMARY KEY,
+            friend_code TEXT,
+            server TEXT
+        )''')
+        self.conn.commit()
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
 
     @filter.command_group("mai")
     async def mai(self, event: AstrMessageEvent):
-        yield event.plain_result(help_text)
+        pass
 
     @mai.command("help", default=True)
     async def mai_help(self, event: AstrMessageEvent):
+        """显示帮助信息"""
         yield event.plain_result(help_text)
 
     @mai.command("bind")
     async def mai_bind(self, event: AstrMessageEvent, server: str="", friend_code: str=""):
+        """绑定好友码，当前仅支持国际服"""
         if server == "help" and friend_code == "":
             yield event.plain_result("""服务器可用参数说明:
 INT int 国际服 國際服 International
@@ -53,7 +66,7 @@ MUNET munet MuNET""")
                           "JPN", "jpn"]:
             yield event.plain_result("服务器输错了喵！请使用 INT、CN、RIN 或 MUNET 作为服务器参数")
             return
-        if server != "INT" and server != "int" and server != "国际服" and server != "International":
+        if server not in ["INT", "int", "国际服", "International"]:
             yield event.plain_result(f"{server} 的绑定功能正在开发喵~为什么不去找开发者催更呢w？")
             return
         if len(event.message_str.split()) < 3:
@@ -62,10 +75,12 @@ MUNET munet MuNET""")
         if len(friend_code) != 13 or not friend_code.isdigit():
             yield event.plain_result("好友码输错了喵！好友码应该是13位数字")
             return
-
-    @mai.command("debug")
-    async def mai_debug(self, event: AstrMessageEvent):
-        yield event.plain_result(f"[DEBUG] SID= {self.sid} , PASSWORD= {self.password}")
+        if server in ["INT", "int", "国际服", "International"]:
+            qq_id = event.get_sender_id()
+            normalized_server = "INT"
+            self.conn.execute('INSERT OR REPLACE INTO bindings (qq_id, friend_code, server) VALUES (?, ?, ?)', (qq_id, friend_code, normalized_server))
+            self.conn.commit()
+            yield event.plain_result(f"成功绑定国际服好友码 {friend_code} 喵！")
 
     @mai.command("b50")
     async def mai_b50(self, event: AstrMessageEvent):
@@ -81,6 +96,7 @@ MUNET munet MuNET""")
             return
         yield event.plain_result(f"[DEBUG] SID= {bot_sid} , PASSWORD= {bot_password}")
 
+        
         # code for image generation here
         # chain= [
         #     Comp.At(qq=event.get_sender_id()),
@@ -89,8 +105,16 @@ MUNET munet MuNET""")
         # ]
         # yield event.chain_result(chain)
         
-    # @mai.command("search")
+    # @mai.command("search") 
     
+    #@filter.command_group("chu")
+    #async def chu(self, event: AstrMessageEvent):
+    #    pass
+    @filter.command("chu")
+    async def chu_search(self, event: AstrMessageEvent, keyword: str=""):
+        yield event.plain_result("中二相关功能正在开发喵！为什么不去找开发者催更呢w？")
+
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
-        pass
+        if hasattr(self, 'conn'):
+            self.conn.close()
