@@ -86,10 +86,9 @@ MUNET munet MuNET""")
     @mai.command("view-all-binds")
     async def mai_view_all_binds(self, event: AstrMessageEvent, force: str=""):
         """管理员指令，查看所有绑定信息"""
-        if not event.get_group_id() == "":
-            yield event.plain_result("这个指令只能在私聊中使用喵！如要強制在群里使用，请添加--force参数")
-            if force != "--force":
-                return
+        if event.get_group_id() != "" and force != "--force" and force != "-f": # 如果不是私聊且没有强制参数
+            yield event.plain_result("这个指令只能在私聊中使用喵！如要強制在群里使用，请添加--force或-f参数")
+            return
         cursor = self.conn.cursor()
         cursor.execute('SELECT qq_id, friend_code, server FROM bindings')
         rows = cursor.fetchall()
