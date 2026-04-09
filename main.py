@@ -1,4 +1,4 @@
-not astrbot.api.event import filter, AstrMessageEvent
+from astrbot.api.event import filter, AstrMessageEvent
 import astrbot.api.message_components as Comp
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
