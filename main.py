@@ -78,12 +78,12 @@ MUNET munet MuNET""")
         logger.info(f"[DEBUG] SID= {bot_sid} , PASSWORD= {bot_password}")
 
         # code for image generation here
-        #chain= [
-        #    Comp.At(qq=event.get_sender_id()),
-        #    Comp.Plain(" 你的B50来了喵~"),
-        #    Comp.Image.fromFileSystem(f"data/plugin_data/{plugin_name}/b50_image/{event.get_sender_id()}.jpg")
-        #]
-        #yield event.chain_result(chain)
+        # chain= [
+        #     Comp.At(qq=event.get_sender_id()),
+        #     Comp.Plain(" 你的B50来了喵~"),
+        #     Comp.Image.fromFileSystem(f"data/plugin_data/{plugin_name}/b50_image/{event.get_sender_id()}.jpg")
+        # ]
+        # yield event.chain_result(chain)
         
     # @mai.command("search")
     
