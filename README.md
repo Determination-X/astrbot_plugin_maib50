@@ -1,4 +1,4 @@
-# astrbot-plugin-helloworld
+# astrbot-plugin-maib50
 
 AstrBot B50插件 / An AstrBot plugin for B50
 
