@@ -82,6 +82,21 @@ MUNET munet MuNET""")
             self.conn.commit()
             yield event.plain_result(f"成功绑定国际服好友码 {friend_code} 喵！")
 
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @mai.command("view-all-binds")
+    async def mai_view_all_binds(self, event: AstrMessageEvent):
+        """管理员指令，查看所有绑定信息"""
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT qq_id, friend_code, server FROM bindings')
+        rows = cursor.fetchall()
+        if not rows:
+            yield event.plain_result("没有任何绑定信息喵！")
+            return
+        result = "所有绑定信息:\n"
+        for qq_id, friend_code, server in rows:
+            result += f"QQ ID: {qq_id}, 服务器: {server}, 好友码: {friend_code}\n"
+        yield event.plain_result(result)
+        
     @mai.command("b50")
     async def mai_b50(self, event: AstrMessageEvent):
         """查询maimai b50数据"""
