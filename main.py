@@ -94,28 +94,62 @@ MUNET munet MuNET""")
         if bot_password == "":
             yield event.plain_result("插件未配置BOT_PASSWORD，无法查询数据喵！请联系管理员配置好BOT_PASSWORD后再试喵！")
             return
-        yield event.plain_result(f"[DEBUG] SID= {bot_sid} , PASSWORD= {bot_password}")
-
+        
+        qq_id = event.get_sender_id()
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT friend_code, server FROM bindings WHERE qq_id = ?', (qq_id,))
+        row = cursor.fetchone()
+        if not row:
+            yield event.plain_result("未绑定好友码，请先使用 /mai bind INT <好友码> 绑定")
+            return
+        friend_code, server = row
+        
+        yield event.plain_result(f"[DEBUG] SID= {bot_sid} , PASSWORD= {bot_password}, Friend Code= {friend_code}")
+        
         # Login using aiohttp
-        try:
-            async with aiohttp.ClientSession() as session:
-                data = {
-                    'retention': '1',
-                    'sid': bot_sid,
-                    'password': bot_password
-                }
-                async with session.post('https://lng-tgk-aime-gw.am-all.net/common_auth/login/sid', data=data, allow_redirects=False) as resp:
-                    if resp.status == 302:
-                        location = resp.headers.get('Location')
-                        if location and 'ssid=' in location:
-                            ssid = location.split('ssid=')[1].split('&')[0]
-                            yield event.plain_result(f"登录成功，SSID: {ssid}")
+        login_url = "https://lng-tgk-aime-gw.am-all.net/common_auth/login/sid"
+        login_data = {
+            'retention': '1',
+            'sid': bot_sid,
+            'password': bot_password
+        }
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Cache-Control': 'max-age=0',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Origin': 'https://lng-tgk-aime-gw.am-all.net',
+            'Referer': 'https://lng-tgk-aime-gw.am-all.net/common_auth/login?redirect_url=https%3A%2F%2Fmaimaidx-eng.com%2Fmaimai-mobile%2F&site_id=maimaidxex&back_url=https%3A%2F%2Fmaimai.sega.com%2F&alof=0',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+            'Sec-Ch-Ua': '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.post(login_url, data=login_data, headers=headers, allow_redirects=True) as resp:
+                    if resp.status == 200:
+                        final_url = str(resp.url)
+                        if 'ssid=' in final_url:
+                            ssid = final_url.split('ssid=')[1].split('&')[0] if '&' in final_url.split('ssid=')[1] else final_url.split('ssid=')[1]
+                            yield event.plain_result(f"[DEBUG] 登录成功，SSID= {ssid}")
+                            # TODO: Use ssid to fetch b50 data
                         else:
-                            yield event.plain_result("登录失败：未找到SSID")
+                            yield event.plain_result("登录成功，但未找到SSID")
                     else:
-                        yield event.plain_result(f"登录失败：状态码 {resp.status}")
-        except Exception as e:
-            yield event.plain_result(f"登录出错：{str(e)}")
+                        yield event.plain_result(f"登录失败，状态码: {resp.status}")
+            except Exception as e:
+                yield event.plain_result(f"登录出错: {str(e)}")
+        
+        
+        # code for image generation here
         # chain= [
         #     Comp.At(qq=event.get_sender_id()),
         #     Comp.Plain(" 你的B50来了喵~"),
