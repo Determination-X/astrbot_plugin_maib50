@@ -1,7 +1,8 @@
 from astrbot.api.event import filter, AstrMessageEvent
 import astrbot.api.message_components as Comp
 from astrbot.api.star import Context, Star, register
-from astrbot.api import logger, AstrBotConfig
+from astrbot.api import logger#, AstrBotConfig
+from astrbot.api.all import AstrBotConfig
 import aiohttp
 
 plugin_name = "astrbot_plugin_maib50"
