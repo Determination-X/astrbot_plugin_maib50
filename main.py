@@ -100,6 +100,19 @@ MUNET munet MuNET""")
             result += f"QQ ID: {qq_id}, 服务器: {server}, 好友码: {friend_code}\n"
         yield event.plain_result(result)
 
+    @mai.command("unbind")
+    async def mai_unbind(self, event: AstrMessageEvent):
+        """解绑好友码"""
+        qq_id = event.get_sender_id()
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT friend_code, server FROM bindings WHERE qq_id = ?', (qq_id,))
+        row = cursor.fetchone()
+        if not row:
+            yield event.plain_result("你还没有绑定任何好友码喵！")
+            return
+        self.conn.execute('DELETE FROM bindings WHERE qq_id = ?', (qq_id,))
+        self.conn.commit()
+        yield event.plain_result("解绑成功喵！")
 
     @mai.command("b50")
     async def mai_b50(self, event: AstrMessageEvent):
