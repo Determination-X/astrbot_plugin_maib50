@@ -81,11 +81,16 @@ MUNET munet MuNET""")
             self.conn.execute('INSERT OR REPLACE INTO bindings (qq_id, friend_code, server) VALUES (?, ?, ?)', (qq_id, friend_code, normalized_server))
             self.conn.commit()
             yield event.plain_result(f"成功绑定国际服好友码 {friend_code} 喵！")
-
+    
+    @filter.event_message_type(filter.EventMessageType.PRIVATE_MESSAGE)
     @filter.permission_type(filter.PermissionType.ADMIN)
     @mai.command("view-all-binds")
-    async def mai_view_all_binds(self, event: AstrMessageEvent):
+    async def mai_view_all_binds(self, event: AstrMessageEvent, force: str=""):
         """管理员指令，查看所有绑定信息"""
+        if not event.get_group_id() == "":
+            yield event.plain_result("这个指令只能在私聊中使用喵！如要強制在群里使用，请添加--force参数")
+            if force != "--force":
+                return
         cursor = self.conn.cursor()
         cursor.execute('SELECT qq_id, friend_code, server FROM bindings')
         rows = cursor.fetchall()
@@ -96,7 +101,8 @@ MUNET munet MuNET""")
         for qq_id, friend_code, server in rows:
             result += f"QQ ID: {qq_id}, 服务器: {server}, 好友码: {friend_code}\n"
         yield event.plain_result(result)
-        
+
+
     @mai.command("b50")
     async def mai_b50(self, event: AstrMessageEvent):
         """查询maimai b50数据"""
