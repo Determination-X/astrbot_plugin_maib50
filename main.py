@@ -75,7 +75,7 @@ MUNET munet MuNET""")
         if bot_password == "":
             yield event.plain_result("插件未配置BOT_PASSWORD，无法查询数据喵！请联系管理员配置好BOT_PASSWORD后再试喵！")
             return
-        logger.info(f"[DEBUG] SID= {bot_sid} , PASSWORD= {bot_password}")
+        yield event.plain_result(f"[DEBUG] SID= {bot_sid} , PASSWORD= {bot_password}")
 
         # code for image generation here
         # chain= [
