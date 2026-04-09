@@ -18,10 +18,10 @@ help_text = """/mai可用指令:
 咕咕中: 日服"""
 
 @register("maib50", "Determination_X", "Maib50 国际服插件", "1.0.0")
-class MyPlugin(Star):
+class MaiPlugin(Star):
     def __init__(self, context: Context, config: None):
         super().__init__(context)
-        self.config= config or {}# 获取插件配置，配置文件路径为 `data/plugin_data/astrbot_plugin_maib50/config.json`，如果没有这个文件会自动创建一个空的配置文件。可以在这个配置文件里添加一些插件需要的配置项。
+        self.config = config or {}# 获取插件配置，配置文件路径为 `data/plugin_data/astrbot_plugin_maib50/config.json`，如果没有这个文件会自动创建一个空的配置文件。可以在这个配置文件里添加一些插件需要的配置项。
         self.sid = self.config.get("BOT_SID", "") # 从配置文件中获取 BOT_SID 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
         self.password = self.config.get("BOT_PASSWORD", "") # 从配置文件中获取 BOT_PASSWORD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
     async def initialize(self):
@@ -63,6 +63,9 @@ MUNET munet MuNET""")
             yield event.plain_result("好友码输错了喵！好友码应该是13位数字")
             return
 
+    @mai.command("debug")
+    async def mai_debug(self, event: AstrMessageEvent):
+        yield event.plain_result(f"[DEBUG] SID= {self.sid} , PASSWORD= {self.password}")
 
     @mai.command("b50")
     async def mai_b50(self, event: AstrMessageEvent):
