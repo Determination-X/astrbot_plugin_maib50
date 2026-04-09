@@ -39,7 +39,7 @@ class MaiPlugin(Star):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
 
     @filter.command_group("mai")
-    async def mai(self, event: AstrMessageEvent):
+    async def mai(self):
         pass
 
     @mai.command("help", default=True)
@@ -80,20 +80,20 @@ MUNET munet MuNET""")
             normalized_server = "INT"
             self.conn.execute('INSERT OR REPLACE INTO bindings (qq_id, friend_code, server) VALUES (?, ?, ?)', (qq_id, friend_code, normalized_server))
             self.conn.commit()
-            yield event.plain_result(f"成功绑定国际服好友码 {friend_code} 喵！")
+            yield event.plain_result(f"成功绑定国际服好友码")
     
     @filter.permission_type(filter.PermissionType.ADMIN)
     @mai.command("view-all-binds")
     async def mai_view_all_binds(self, event: AstrMessageEvent, force: str=""):
         """管理员指令，查看所有绑定信息"""
-        if event.get_group_id() != "" and force != "--force" and force != "-f": # 如果不是私聊且没有强制参数
-            yield event.plain_result("这个指令只能在私聊中使用喵！如要強制在群里使用，请添加--force或-f参数")
+        if event.get_group_id() != "" and force is not ["--force", "-f"]: # 如果不是私聊且没有强制参数
+            yield event.plain_result("该指令涉及玩家好友码隐私，只能在私聊中使用喵！如要強制在群里使用，请添加--force或-f参数")
             return
         cursor = self.conn.cursor()
         cursor.execute('SELECT qq_id, friend_code, server FROM bindings')
         rows = cursor.fetchall()
         if not rows:
-            yield event.plain_result("没有任何绑定信息喵！")
+            yield event.plain_result("没有任何绑定信息")
             return
         result = "所有绑定信息:\n"
         for qq_id, friend_code, server in rows:
@@ -108,11 +108,11 @@ MUNET munet MuNET""")
         cursor.execute('SELECT friend_code, server FROM bindings WHERE qq_id = ?', (qq_id,))
         row = cursor.fetchone()
         if not row:
-            yield event.plain_result("你还没有绑定任何好友码喵！")
+            yield event.plain_result("你还没有绑定任何好友码")
             return
         self.conn.execute('DELETE FROM bindings WHERE qq_id = ?', (qq_id,))
         self.conn.commit()
-        yield event.plain_result("解绑成功喵！")
+        yield event.plain_result("解绑成功")
 
     @mai.command("b50")
     async def mai_b50(self, event: AstrMessageEvent):
