@@ -1,7 +1,8 @@
 from astrbot.api.event import filter, AstrMessageEvent
 import astrbot.api.message_components as Comp
 from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
+from astrbot.api import logger, AstrBotConfig
+import aiohttp
 
 plugin_name = "astrbot_plugin_maib50"
 help_text = """/mai可用指令: 
@@ -18,21 +19,12 @@ help_text = """/mai可用指令:
 
 @register("maib50", "Determination_X", "Maib50 国际服插件", "1.0.0")
 class MyPlugin(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
+        self.config= config # 获取插件配置，配置文件路径为 `data/plugin_data/astrbot_plugin_maib50/config.json`，如果没有这个文件会自动创建一个空的配置文件。可以在这个配置文件里添加一些插件需要的配置项。
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
-
-    # 注册指令的装饰器。指令名为 helloworld。注册成功后，发送 `/helloworld` 就会触发这个指令，并回复 `你好, {user_name}!`
-    @filter.command("helloworld")
-    async def helloworld(self, event: AstrMessageEvent):
-        """这是一个 hello world 指令""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
-        user_name = event.get_sender_name()
-        message_str = event.message_str # 用户发的纯文本消息字符串
-        message_chain = event.get_messages() # 用户所发的消息的消息链 # from astrbot.api.message_components import *
-        logger.info(message_chain)
-        yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
 
     @filter.command_group("mai")
     async def mai(self, event: AstrMessageEvent):
@@ -75,13 +67,23 @@ MUNET munet MuNET""")
     async def mai_b50(self, event: AstrMessageEvent):
         """查询maimai b50数据"""
         # code for login and data fetching here
+        bot_sid= self.config.get("BOT_SID", "")
+        bot_password= self.config.get("BOT_PASSWORD", "")
+        if bot_sid == "":
+            yield event.plain_result("插件未配置BOT_SID，无法查询数据喵！请联系管理员配置好BOT_SID后再试喵！")
+            return
+        if bot_password == "":
+            yield event.plain_result("插件未配置BOT_PASSWORD，无法查询数据喵！请联系管理员配置好BOT_PASSWORD后再试喵！")
+            return
+        logger.info(f"[DEBUG] SID= {bot_sid} , PASSWORD= {bot_password}")
+
         # code for image generation here
-        chain= [
-            Comp.At(qq=event.get_sender_id()),
-            Comp.Plain(" 你的B50来了喵~"),
-            Comp.Image.fromFileSystem(f"data/plugin_data/{plugin_name}/b50_image/{event.get_sender_id()}.jpg")
-        ]
-        yield event.chain_result(chain)
+        #chain= [
+        #    Comp.At(qq=event.get_sender_id()),
+        #    Comp.Plain(" 你的B50来了喵~"),
+        #    Comp.Image.fromFileSystem(f"data/plugin_data/{plugin_name}/b50_image/{event.get_sender_id()}.jpg")
+        #]
+        #yield event.chain_result(chain)
         
     # @mai.command("search")
     
