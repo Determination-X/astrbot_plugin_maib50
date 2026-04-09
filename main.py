@@ -65,7 +65,7 @@ MUNET munet MuNET""")
 
     @mai.command("debug")
     async def mai_debug(self, event: AstrMessageEvent):
-        yield event.plain_result(f"[DEBUG] SID= {self.sid} , PASSWORD= {self.password}, self.config= {self.config}")
+        yield event.plain_result(f"[DEBUG] SID= {self.sid} , PASSWORD= {self.password}")
 
     @mai.command("b50")
     async def mai_b50(self, event: AstrMessageEvent):
