@@ -9,11 +9,14 @@ import pickle
 from pathlib import Path
 
 plugin_name = "astrbot_plugin_maib50"
-help_text = """/mai可用指令: 
+help_text = """/mai可用指令:
 ├─/mai b50
 ├─/mai bind INT <好友码>
 │  /mai bind CN (开发中)
 │  /mai bind JP (暫定)
+│  /mai bind RIN (开发中)
+│  /mai bind MUNET (开发中)
+├─/mai unbind [服务器]
 ├─/mai help
 └─/mai search <关键词>
 
@@ -33,6 +36,7 @@ class MaiPlugin(Star):
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self._ensure_bindings_table()
+        self.debug_mode = True # 是否开启调试模式，开启后会在查询过程中输出更多调试信息，方便开发和排查问题。发布前会关闭。
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
@@ -114,6 +118,11 @@ class MaiPlugin(Star):
             "munet": "MUNET",
         }
         return mapping.get(normalized)
+
+    async def _debug(self, event: AstrMessageEvent, message: str):
+        if not self.debug_mode:
+            return
+        yield event.plain_result(f"[DEBUG] {message}")
 
     @filter.command_group("mai")
     async def mai(self):
@@ -261,8 +270,8 @@ MUNET munet MuNET""")
             return
         friend_code, server = row
         
-        if event.get_sender_id() == "1244547745": # 这个QQ号是我的测试号，调试用，发布前会删掉
-            yield event.plain_result(f"[DEBUG] SID= {bot_sid} , PASSWORD= {bot_password}, Friend Code= {friend_code}")
+        async for debug_msg in self._debug(event, f"SID= {bot_sid} , PASSWORD= {bot_password}, Friend Code= {friend_code}"):
+            yield debug_msg
         
         # Login using aiohttp
         login_url = "https://lng-tgk-aime-gw.am-all.net/common_auth/login/sid"
@@ -316,24 +325,30 @@ MUNET munet MuNET""")
                 if cached_cookies:
                     # Load cached cookies into session
                     session.cookie_jar._cookies = cached_cookies # pyright: ignore[reportAttributeAccessIssue]
-                    yield event.plain_result("[DEBUG] 使用缓存的cookies")
+                    async for debug_msg in self._debug(event, "使用缓存的cookies"):
+                        yield debug_msg
                     
                     # Verify if cached cookies are still valid by making a test request
                     test_url = "https://maimaidx-eng.com/maimai-mobile/home"
                     async with session.get(test_url, allow_redirects=False) as test_resp:
-                        yield event.plain_result(f"[DEBUG] 验证缓存cookies状态码: {test_resp.status}")
+                        async for debug_msg in self._debug(event, f"验证缓存cookies状态码: {test_resp.status}"):
+                            yield debug_msg
                         if test_resp.status == 200:
-                            yield event.plain_result("[DEBUG] 缓存cookies仍然有效，跳过登录")
+                            async for debug_msg in self._debug(event, "缓存cookies仍然有效，跳过登录"):
+                                yield debug_msg
                             needs_login = False
                         else:
-                            yield event.plain_result("[DEBUG] 缓存cookies已过期，重新登录")
+                            async for debug_msg in self._debug(event, "缓存cookies已过期，重新登录"):
+                                yield debug_msg
                 
                 if needs_login:
-                    yield event.plain_result("[DEBUG] 执行登录流程")
+                    async for debug_msg in self._debug(event, "执行登录流程"):
+                        yield debug_msg
                     
                     # First, GET the login page to establish session
                     async with session.get(login_page_url, headers=get_headers) as resp:
-                        yield event.plain_result(f"[DEBUG] GET status: {resp.status}")
+                        async for debug_msg in self._debug(event, f"GET status: {resp.status}"):
+                            yield debug_msg
                         if resp.status != 200:
                             yield event.plain_result(f"获取登录页面失败，状态码: {resp.status}")
                             return
@@ -341,31 +356,39 @@ MUNET munet MuNET""")
                     # Then, POST the login data
                     async with session.post(login_url, data=login_data, headers=headers, allow_redirects=True) as resp:
                         final_url = str(resp.url)
-                        yield event.plain_result(f"[DEBUG] POST Response status: {resp.status}, Final URL: {final_url}")
-                        yield event.plain_result(f"[DEBUG] History length: {len(resp.history)}")
+                        async for debug_msg in self._debug(event, f"POST Response status: {resp.status}, Final URL: {final_url}"):
+                            yield debug_msg
+                        async for debug_msg in self._debug(event, f"History length: {len(resp.history)}"):
+                            yield debug_msg
                         
                         # Check redirect history for ssid
                         ssid = None
                         for i, redirect_resp in enumerate(resp.history):
                             location = redirect_resp.headers.get('Location', '')
-                            yield event.plain_result(f"[DEBUG] Redirect {i}: {location}")
+                            async for debug_msg in self._debug(event, f"Redirect {i}: {location}"):
+                                yield debug_msg
                             if 'ssid=' in location:
                                 ssid = location.split('ssid=')[1].split('&')[0] if '&' in location.split('ssid=')[1] else location.split('ssid=')[1]
                                 break
                         
                         cookies = session.cookie_jar.filter_cookies(final_url) # pyright: ignore[reportArgumentType]
-                        yield event.plain_result(f"[DEBUG] Cookies: {dict(cookies)}")
+                        async for debug_msg in self._debug(event, f"Cookies: {dict(cookies)}"):
+                            yield debug_msg
                         
                         # Save cookies for future use
                         self._save_cookies(session.cookie_jar)
-                        yield event.plain_result("[DEBUG] cookies已保存")
+                        async for debug_msg in self._debug(event, "cookies已保存"):
+                            yield debug_msg
                         
                         if ssid:
-                            yield event.plain_result(f"[DEBUG] 登录成功，SSID from redirect: {ssid}")
+                            async for debug_msg in self._debug(event, f"登录成功，SSID from redirect: {ssid}"):
+                                yield debug_msg
                         elif cookies.get('ssid'):
-                            yield event.plain_result(f"[DEBUG] 登录成功，SSID from cookie")
+                            async for debug_msg in self._debug(event, "登录成功，SSID from cookie"):
+                                yield debug_msg
                         elif final_url == "https://maimaidx-eng.com/maimai-mobile/home/":
-                            yield event.plain_result("[DEBUG] 登录成功，到达home页面")
+                            async for debug_msg in self._debug(event, "登录成功，到达home页面"):
+                                yield debug_msg
                         else:
                             yield event.plain_result(f"登录失败，状态码: {resp.status}")
                             return
@@ -373,10 +396,11 @@ MUNET munet MuNET""")
                 # At this point, session has valid cookies, proceed with b50 data fetching
                 # Start with fetching friend profile to verify friend status
                 friend_bio_url = f"https://maimaidx-eng.com/maimai-mobile/friend/friendDetail/?idx={friend_code}"
-                # TODO: checking if friend is already added or not, if not, add friend using friend code, then fetch b50 data. If already added, directly fetch b50 data. This is because maimai's API for fetching b50 data requires the target player to be in the friend list. 
+                # TODO: 1. checking if friend is already added or not, if not, add friend using friend code, then fetch b50 data. If already added, directly fetch b50 data. This is because maimai's API for fetching b50 data requires the target player to be in the friend list. 
                 
+
                 # yield event.plain_result("[DEBUG] 准备获取B50数据")
-                # TODO: Fetch b50 data here
+                # TODO: 2. Fetch b50 data here
                 
             except Exception as e:
                 yield event.plain_result(f"登录出错: {str(e)}")
@@ -395,8 +419,27 @@ MUNET munet MuNET""")
     #@filter.command_group("chu")
     #async def chu(self, event: AstrMessageEvent):
     #    pass
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("debug")
+    async def debug(self, event: AstrMessageEvent, debug_flag: str="toggle"):
+        """调试指令，输出调试信息，发布前会删除"""
+        if debug_flag == "toggle":
+            self.debug_mode = not self.debug_mode
+            yield event.plain_result(f"调试模式已 {'开启' if self.debug_mode else '关闭'}")
+        elif debug_flag == "status":
+            yield event.plain_result(f"调试模式当前状态: {'开启' if self.debug_mode else '关闭'}")
+        elif debug_flag == "on":
+            self.debug_mode = True
+            yield event.plain_result("调试模式已开启")
+        elif debug_flag == "off":
+            self.debug_mode = False
+            yield event.plain_result("调试模式已关闭")
+        else:
+            yield event.plain_result("无效的调试参数！使用 /debug toggle 切换调试模式，/debug status 查看当前状态")
+
     @filter.command("chu")
-    async def chu_search(self, event: AstrMessageEvent, keyword: str=""):
+    async def chu(self, event: AstrMessageEvent, keyword: str=""):
         yield event.plain_result("中二相关功能正在开发喵！为什么不去找开发者催更呢w？")
 
     async def terminate(self):
