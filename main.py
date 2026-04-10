@@ -165,11 +165,36 @@ MUNET munet MuNET""")
             'Sec-Ch-Ua-Platform': '"Windows"'
         }
         
+        login_page_url = "https://lng-tgk-aime-gw.am-all.net/common_auth/login?redirect_url=https%3A%2F%2Fmaimaidx-eng.com%2Fmaimai-mobile%2F&site_id=maimaidxex&back_url=https%3A%2F%2Fmaimai.sega.com%2F&alof=0"
+        get_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Sec-Ch-Ua': '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"'
+        }
+        
         async with aiohttp.ClientSession() as session:
             try:
+                # First, GET the login page to establish session
+                async with session.get(login_page_url, headers=get_headers) as resp:
+                    yield event.plain_result(f"[DEBUG] GET status: {resp.status}")
+                    if resp.status != 200:
+                        yield event.plain_result(f"获取登录页面失败，状态码: {resp.status}")
+                        return
+                
+                # Then, POST the login data
                 async with session.post(login_url, data=login_data, headers=headers, allow_redirects=True) as resp:
                     final_url = str(resp.url)
-                    yield event.plain_result(f"[DEBUG] Response status: {resp.status}, Final URL: {final_url}")
+                    yield event.plain_result(f"[DEBUG] POST Response status: {resp.status}, Final URL: {final_url}")
                     if resp.status == 200 and 'ssid=' in final_url:
                         ssid = final_url.split('ssid=')[1].split('&')[0] if '&' in final_url.split('ssid=')[1] else final_url.split('ssid=')[1]
                         yield event.plain_result(f"[DEBUG] 登录成功，SSID= {ssid}")
