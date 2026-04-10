@@ -6,6 +6,7 @@ import aiohttp# 异步HTTP请求库，用于向maimai net爬取数据
 import os 
 import sqlite3 # 存储绑定信息的数据库
 import pickle
+import re
 from pathlib import Path
 
 plugin_name = "astrbot_plugin_maib50"
@@ -268,13 +269,38 @@ MUNET munet MuNET""")
                             return
                 
                 # At this point, session has valid cookies, proceed with b50 data fetching
-                yield event.plain_result("[DEBUG] 准备获取B50数据")
-                # TODO: Fetch b50 data here
+                friend_detail_url = f"https://maimaidx-eng.com/maimai-mobile/friend/friendDetail/?idx={friend_code}"
+                async with session.get(friend_detail_url, allow_redirects=False) as resp:
+                    if resp.status == 200:
+                        yield event.plain_result("好友已添加，正在查询b50")
+                        # TODO: Fetch b50 data here
+                    elif resp.status == 302:
+                        # send invite
+                        invite_url = "https://maimaidx-eng.com/maimai-mobile/friend/search/invite/"
+                        async with session.get(invite_url) as resp_invite:
+                            if resp_invite.status == 200:
+                                html = await resp_invite.text()
+                                token_match = re.search(r'name="token" value="([^"]*)"', html)
+                                if token_match:
+                                    token = token_match.group(1)
+                                    invite_data = {
+                                        'idx': friend_code,
+                                        'token': token,
+                                        'invite': ''
+                                    }
+                                    async with session.post(invite_url, data=invite_data, allow_redirects=True) as resp_post:
+                                        yield event.plain_result("查找到已绑定的好友码但未添加好友，已发送申请，查看你的maimaiNET并通过来自BOT的好友申请，并发送/mai approved")
+                                else:
+                                    yield event.plain_result("无法获取邀请令牌")
+                            else:
+                                yield event.plain_result("无法访问邀请页面")
+                    else:
+                        yield event.plain_result("检查好友状态失败")
                 
             except Exception as e:
                 yield event.plain_result(f"登录出错: {str(e)}")
         
-        
+            
         # code for image generation here
         # chain= [
         #     Comp.At(qq=event.get_sender_id()),
