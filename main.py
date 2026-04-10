@@ -5,6 +5,8 @@ from astrbot.api import logger, AstrBotConfig
 import aiohttp# 异步HTTP请求库，用于向maimai net爬取数据
 import os 
 import sqlite3 # 存储绑定信息的数据库
+import pickle
+from pathlib import Path
 
 plugin_name = "astrbot_plugin_maib50"
 help_text = """/mai可用指令: 
@@ -27,6 +29,7 @@ class MaiPlugin(Star):
         self.sid = self.config.get("INT", {}).get("BOT_SID", "") # 从配置文件中获取 BOT_SID 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
         self.password = self.config.get("INT", {}).get("BOT_PASSWORD", "") # 从配置文件中获取 BOT_PASSWORD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
         self.db_path = os.path.join("data", "plugin_data", plugin_name, "bindings.db")
+        self.cookies_path = os.path.join("data", "plugin_data", plugin_name, "cookies.pkl")
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self.conn.execute('''CREATE TABLE IF NOT EXISTS bindings (
@@ -37,6 +40,25 @@ class MaiPlugin(Star):
         self.conn.commit()
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
+
+    def _load_cookies(self):
+        """从文件加载保存的cookies"""
+        try:
+            if os.path.exists(self.cookies_path):
+                with open(self.cookies_path, 'rb') as f:
+                    return pickle.load(f)
+        except Exception as e:
+            logger.warning(f"Failed to load cookies: {e}")
+        return None
+
+    def _save_cookies(self, jar):
+        """保存cookies到文件"""
+        try:
+            os.makedirs(os.path.dirname(self.cookies_path), exist_ok=True)
+            with open(self.cookies_path, 'wb') as f:
+                pickle.dump(jar._cookies, f)
+        except Exception as e:
+            logger.warning(f"Failed to save cookies: {e}")
 
     @filter.command_group("mai")
     async def mai(self):
@@ -184,6 +206,17 @@ MUNET munet MuNET""")
         
         async with aiohttp.ClientSession() as session:
             try:
+                # Try to load cached cookies first
+                cached_cookies = self._load_cookies()
+                if cached_cookies:
+                    # Load cached cookies into session
+                    session.cookie_jar._cookies = cached_cookies
+                    yield event.plain_result("[DEBUG] 使用缓存的cookies")
+                    # TODO: Test if cached cookies are still valid
+                    # If not valid, perform login
+                else:
+                    yield event.plain_result("[DEBUG] 未找到缓存的cookies，执行登录")
+                
                 # First, GET the login page to establish session
                 async with session.get(login_page_url, headers=get_headers) as resp:
                     yield event.plain_result(f"[DEBUG] GET status: {resp.status}")
@@ -208,6 +241,10 @@ MUNET munet MuNET""")
                     
                     cookies = session.cookie_jar.filter_cookies(final_url)
                     yield event.plain_result(f"[DEBUG] Cookies: {dict(cookies)}")
+                    
+                    # Save cookies for future use
+                    self._save_cookies(session.cookie_jar)
+                    yield event.plain_result("[DEBUG] cookies已保存")
                     
                     if ssid:
                         yield event.plain_result(f"[DEBUG] 登录成功，SSID from redirect: {ssid}")
