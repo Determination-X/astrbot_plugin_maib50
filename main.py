@@ -168,14 +168,20 @@ MUNET munet MuNET""")
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.post(login_url, data=login_data, headers=headers, allow_redirects=True) as resp:
-                    if resp.status == 200:
-                        final_url = str(resp.url)
-                        if 'ssid=' in final_url:
-                            ssid = final_url.split('ssid=')[1].split('&')[0] if '&' in final_url.split('ssid=')[1] else final_url.split('ssid=')[1]
+                    final_url = str(resp.url)
+                    yield event.plain_result(f"[DEBUG] Response status: {resp.status}, Final URL: {final_url}")
+                    if resp.status == 200 and 'ssid=' in final_url:
+                        ssid = final_url.split('ssid=')[1].split('&')[0] if '&' in final_url.split('ssid=')[1] else final_url.split('ssid=')[1]
+                        yield event.plain_result(f"[DEBUG] 登录成功，SSID= {ssid}")
+                        # TODO: Use ssid to fetch b50 data
+                    elif resp.status == 302:
+                        location = resp.headers.get('Location', '')
+                        yield event.plain_result(f"[DEBUG] Redirect to: {location}")
+                        if 'ssid=' in location:
+                            ssid = location.split('ssid=')[1].split('&')[0] if '&' in location.split('ssid=')[1] else location.split('ssid=')[1]
                             yield event.plain_result(f"[DEBUG] 登录成功，SSID= {ssid}")
-                            # TODO: Use ssid to fetch b50 data
                         else:
-                            yield event.plain_result("登录成功，但未找到SSID")
+                            yield event.plain_result("登录失败，未找到SSID")
                     else:
                         yield event.plain_result(f"登录失败，状态码: {resp.status}")
             except Exception as e:
