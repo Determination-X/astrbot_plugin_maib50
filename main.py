@@ -212,7 +212,7 @@ MUNET munet MuNET""")
                 
                 if cached_cookies:
                     # Load cached cookies into session
-                    session.cookie_jar._cookies = cached_cookies # pyright: ignore[reportAttributeAccessIssue]
+                    session.cookie_jar._cookies = cached_cookies
                     yield event.plain_result("[DEBUG] 使用缓存的cookies")
                     
                     # Verify if cached cookies are still valid by making a test request
@@ -250,7 +250,7 @@ MUNET munet MuNET""")
                                 ssid = location.split('ssid=')[1].split('&')[0] if '&' in location.split('ssid=')[1] else location.split('ssid=')[1]
                                 break
                         
-                        cookies = session.cookie_jar.filter_cookies(final_url) # pyright: ignore[reportArgumentType]
+                        cookies = session.cookie_jar.filter_cookies(final_url)
                         yield event.plain_result(f"[DEBUG] Cookies: {dict(cookies)}")
                         
                         # Save cookies for future use
