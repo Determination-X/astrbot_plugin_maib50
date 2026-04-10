@@ -195,16 +195,24 @@ MUNET munet MuNET""")
                 async with session.post(login_url, data=login_data, headers=headers, allow_redirects=True) as resp:
                     final_url = str(resp.url)
                     yield event.plain_result(f"[DEBUG] POST Response status: {resp.status}, Final URL: {final_url}")
-                    if resp.status == 200 and 'ssid=' in final_url:
+                    
+                    # Check for ssid in cookies
+                    cookies = session.cookie_jar.filter_cookies(final_url)
+                    ssid_cookie = cookies.get('ssid')
+                    if ssid_cookie:
+                        ssid = ssid_cookie.value
+                        yield event.plain_result(f"[DEBUG] 登录成功，SSID from cookie: {ssid}")
+                        # TODO: Use ssid to fetch b50 data
+                    elif 'ssid=' in final_url:
                         ssid = final_url.split('ssid=')[1].split('&')[0] if '&' in final_url.split('ssid=')[1] else final_url.split('ssid=')[1]
-                        yield event.plain_result(f"[DEBUG] 登录成功，SSID= {ssid}")
+                        yield event.plain_result(f"[DEBUG] 登录成功，SSID from URL: {ssid}")
                         # TODO: Use ssid to fetch b50 data
                     elif resp.status == 302:
                         location = resp.headers.get('Location', '')
                         yield event.plain_result(f"[DEBUG] Redirect to: {location}")
                         if 'ssid=' in location:
                             ssid = location.split('ssid=')[1].split('&')[0] if '&' in location.split('ssid=')[1] else location.split('ssid=')[1]
-                            yield event.plain_result(f"[DEBUG] 登录成功，SSID= {ssid}")
+                            yield event.plain_result(f"[DEBUG] 登录成功，SSID from location: {ssid}")
                         else:
                             yield event.plain_result("登录失败，未找到SSID")
                     else:
