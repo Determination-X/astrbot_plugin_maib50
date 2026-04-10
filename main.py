@@ -195,28 +195,40 @@ MUNET munet MuNET""")
                 async with session.post(login_url, data=login_data, headers=headers, allow_redirects=True) as resp:
                     final_url = str(resp.url)
                     yield event.plain_result(f"[DEBUG] POST Response status: {resp.status}, Final URL: {final_url}")
+                    yield event.plain_result(f"[DEBUG] History length: {len(resp.history)}")
                     
-                    # Check for ssid in cookies
-                    cookies = session.cookie_jar.filter_cookies(final_url)
-                    ssid_cookie = cookies.get('ssid')
-                    if ssid_cookie:
-                        ssid = ssid_cookie.value
-                        yield event.plain_result(f"[DEBUG] 登录成功，SSID from cookie: {ssid}")
-                        # TODO: Use ssid to fetch b50 data
-                    elif 'ssid=' in final_url:
-                        ssid = final_url.split('ssid=')[1].split('&')[0] if '&' in final_url.split('ssid=')[1] else final_url.split('ssid=')[1]
-                        yield event.plain_result(f"[DEBUG] 登录成功，SSID from URL: {ssid}")
-                        # TODO: Use ssid to fetch b50 data
-                    elif resp.status == 302:
-                        location = resp.headers.get('Location', '')
-                        yield event.plain_result(f"[DEBUG] Redirect to: {location}")
+                    # Check redirect history for ssid
+                    ssid = None
+                    for i, redirect_resp in enumerate(resp.history):
+                        location = redirect_resp.headers.get('Location', '')
+                        yield event.plain_result(f"[DEBUG] Redirect {i}: {location}")
                         if 'ssid=' in location:
                             ssid = location.split('ssid=')[1].split('&')[0] if '&' in location.split('ssid=')[1] else location.split('ssid=')[1]
-                            yield event.plain_result(f"[DEBUG] 登录成功，SSID from location: {ssid}")
-                        else:
-                            yield event.plain_result("登录失败，未找到SSID")
+                            break
+                    
+                    cookies = session.cookie_jar.filter_cookies(final_url)
+                    yield event.plain_result(f"[DEBUG] Cookies: {dict(cookies)}")
+                    
+                    if ssid:
+                        yield event.plain_result(f"[DEBUG] 登录成功，SSID from redirect: {ssid}")
+                        # TODO: Use ssid to fetch b50 data
                     else:
-                        yield event.plain_result(f"登录失败，状态码: {resp.status}")
+                        # Check for ssid in cookies
+                        ssid_cookie = cookies.get('ssid')
+                        if ssid_cookie:
+                            ssid = ssid_cookie.value
+                            yield event.plain_result(f"[DEBUG] 登录成功，SSID from cookie: {ssid}")
+                            # TODO: Use ssid to fetch b50 data
+                        elif 'ssid=' in final_url:
+                            ssid = final_url.split('ssid=')[1].split('&')[0] if '&' in final_url.split('ssid=')[1] else final_url.split('ssid=')[1]
+                            yield event.plain_result(f"[DEBUG] 登录成功，SSID from URL: {ssid}")
+                            # TODO: Use ssid to fetch b50 data
+                        elif final_url == "https://maimaidx-eng.com/maimai-mobile/home/":
+                            yield event.plain_result("[DEBUG] 登录成功，到达home页面")
+                            # Assume success, proceed to fetch b50 data using session cookies
+                            # TODO: Fetch b50 data here
+                        else:
+                            yield event.plain_result(f"登录失败，状态码: {resp.status}")
             except Exception as e:
                 yield event.plain_result(f"登录出错: {str(e)}")
         
