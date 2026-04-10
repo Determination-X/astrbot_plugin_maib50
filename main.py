@@ -136,7 +136,8 @@ MUNET munet MuNET""")
             return
         friend_code, server = row
         
-        yield event.plain_result(f"[DEBUG] SID= {bot_sid} , PASSWORD= {bot_password}, Friend Code= {friend_code}")
+        if event.get_sender_id() == "1244547745": # 这个QQ号是我的测试号，调试用，发布前会删掉
+            yield event.plain_result(f"[DEBUG] SID= {bot_sid} , PASSWORD= {bot_password}, Friend Code= {friend_code}")
         
         # Login using aiohttp
         login_url = "https://lng-tgk-aime-gw.am-all.net/common_auth/login/sid"
