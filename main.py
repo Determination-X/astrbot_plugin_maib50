@@ -6,7 +6,6 @@ import aiohttp# 异步HTTP请求库，用于向maimai net爬取数据
 import os 
 import sqlite3 # 存储绑定信息的数据库
 import pickle
-import re
 from pathlib import Path
 
 plugin_name = "astrbot_plugin_maib50"
@@ -33,12 +32,8 @@ class MaiPlugin(Star):
         self.cookies_path = os.path.join("data", "plugin_data", plugin_name, "cookies.pkl")
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
-        self.conn.execute('''CREATE TABLE IF NOT EXISTS bindings (
-            qq_id TEXT PRIMARY KEY,
-            friend_code TEXT,
-            server TEXT
-        )''')
-        self.conn.commit()
+        self._ensure_bindings_table()
+
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
 
@@ -60,6 +55,65 @@ class MaiPlugin(Star):
                 pickle.dump(jar._cookies, f)
         except Exception as e:
             logger.warning(f"Failed to save cookies: {e}")
+
+    def _ensure_bindings_table(self):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='bindings'")
+        if cursor.fetchone():
+            cursor.execute("PRAGMA table_info(bindings)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if columns == ["qq_id", "friend_code", "server"]:
+                cursor.execute("ALTER TABLE bindings RENAME TO bindings_old")
+                cursor.execute(
+                    """CREATE TABLE bindings (
+                    qq_id TEXT,
+                    friend_code TEXT,
+                    server TEXT,
+                    PRIMARY KEY (qq_id, server)
+                )"""
+                )
+                cursor.execute(
+                    "INSERT OR REPLACE INTO bindings (qq_id, friend_code, server) SELECT qq_id, friend_code, server FROM bindings_old"
+                )
+                cursor.execute("DROP TABLE bindings_old")
+                self.conn.commit()
+                return
+        cursor.execute(
+            """CREATE TABLE IF NOT EXISTS bindings (
+            qq_id TEXT,
+            friend_code TEXT,
+            server TEXT,
+            PRIMARY KEY (qq_id, server)
+        )"""
+        )
+        self.conn.commit()
+
+    def _normalize_server(self, server: str) -> str | None:
+        normalized = server.strip()
+        mapping = {
+            "INT": "INT",
+            "int": "INT",
+            "国际服": "INT",
+            "國際服": "INT",
+            "International": "INT",
+            "CN": "CN",
+            "cn": "CN",
+            "国服": "CN",
+            "國服": "CN",
+            "China": "CN",
+            "JP": "JP",
+            "jp": "JP",
+            "日服": "JP",
+            "Japan": "JP",
+            "JPN": "JP",
+            "RIN": "RIN",
+            "rin": "RIN",
+            "Rin服": "RIN",
+            "RinNET": "RIN",
+            "MUNET": "MUNET",
+            "munet": "MUNET",
+        }
+        return mapping.get(normalized)
 
     @filter.command_group("mai")
     async def mai(self):
@@ -89,21 +143,46 @@ MUNET munet MuNET""")
                           "JPN", "jpn"]:
             yield event.plain_result("服务器输错了喵！请使用 INT、CN、RIN 或 MUNET 作为服务器参数")
             return
-        if server not in ["INT", "int", "国际服", "International"]:
-            yield event.plain_result(f"{server} 的绑定功能正在开发喵~为什么不去找开发者催更呢w？")
-            return
         if len(event.message_str.split()) < 3:
             yield event.plain_result("参数错误！请使用 /mai bind <服务器> <好友码> 的格式进行绑定喵")
             return
         if len(friend_code) != 13 or not friend_code.isdigit():
             yield event.plain_result("好友码输错了喵！好友码应该是13位数字")
             return
-        if server in ["INT", "int", "国际服", "International"]:
-            qq_id = event.get_sender_id()
-            normalized_server = "INT"
-            self.conn.execute('INSERT OR REPLACE INTO bindings (qq_id, friend_code, server) VALUES (?, ?, ?)', (qq_id, friend_code, normalized_server))
+        normalized_server = self._normalize_server(server)
+        if not normalized_server:
+            yield event.plain_result("服务器输错了喵！请使用 INT、CN、RIN、JP 或 MUNET 作为服务器参数")
+            return
+        if normalized_server != "INT":
+            yield event.plain_result(f"{server} 的绑定功能正在开发喵~为什么不去找开发者催更呢w？")
+            return
+        qq_id = event.get_sender_id()
+        cursor = self.conn.cursor()
+        cursor.execute(
+            'SELECT friend_code FROM bindings WHERE qq_id = ? AND server = ?',
+            (qq_id, normalized_server),
+        )
+        row = cursor.fetchone()
+        if row:
+            old_code = row[0]
+            if old_code == friend_code:
+                yield event.plain_result(f"你已经绑定了当前国际服好友码：{friend_code}")
+                return
+            self.conn.execute(
+                'INSERT OR REPLACE INTO bindings (qq_id, friend_code, server) VALUES (?, ?, ?)',
+                (qq_id, friend_code, normalized_server),
+            )
             self.conn.commit()
-            yield event.plain_result(f"成功绑定国际服好友码")
+            yield event.plain_result(
+                f"已将国际服好友码从 {old_code} 更新为 {friend_code}"
+            )
+            return
+        self.conn.execute(
+            'INSERT OR REPLACE INTO bindings (qq_id, friend_code, server) VALUES (?, ?, ?)',
+            (qq_id, friend_code, normalized_server),
+        )
+        self.conn.commit()
+        yield event.plain_result(f"成功绑定国际服好友码：{friend_code}")
     
     @filter.permission_type(filter.PermissionType.ADMIN)
     @mai.command("view-all-binds")
@@ -124,10 +203,30 @@ MUNET munet MuNET""")
         yield event.plain_result(result)
 
     @mai.command("unbind")
-    async def mai_unbind(self, event: AstrMessageEvent):
+    async def mai_unbind(self, event: AstrMessageEvent, server: str = ""):
         """解绑好友码"""
         qq_id = event.get_sender_id()
         cursor = self.conn.cursor()
+        if server:
+            normalized_server = self._normalize_server(server)
+            if not normalized_server:
+                yield event.plain_result("服务器输错了喵！请使用 INT、CN、RIN、JP 或 MUNET 作为服务器参数")
+                return
+            cursor.execute(
+                'SELECT friend_code FROM bindings WHERE qq_id = ? AND server = ?',
+                (qq_id, normalized_server),
+            )
+            row = cursor.fetchone()
+            if not row:
+                yield event.plain_result(f"你还没有绑定{normalized_server}的好友码")
+                return
+            self.conn.execute(
+                'DELETE FROM bindings WHERE qq_id = ? AND server = ?',
+                (qq_id, normalized_server),
+            )
+            self.conn.commit()
+            yield event.plain_result(f"已解绑{normalized_server}好友码")
+            return
         cursor.execute('SELECT friend_code, server FROM bindings WHERE qq_id = ?', (qq_id,))
         row = cursor.fetchone()
         if not row:
@@ -152,10 +251,13 @@ MUNET munet MuNET""")
         
         qq_id = event.get_sender_id()
         cursor = self.conn.cursor()
-        cursor.execute('SELECT friend_code, server FROM bindings WHERE qq_id = ?', (qq_id,))
+        cursor.execute(
+            'SELECT friend_code, server FROM bindings WHERE qq_id = ? AND server = ?',
+            (qq_id, 'INT'),
+        )
         row = cursor.fetchone()
         if not row:
-            yield event.plain_result("未绑定好友码，请先使用 /mai bind INT <好友码> 绑定")
+            yield event.plain_result("未绑定国际服好友码，请先使用 /mai bind INT <好友码> 绑定")
             return
         friend_code, server = row
         
@@ -269,38 +371,17 @@ MUNET munet MuNET""")
                             return
                 
                 # At this point, session has valid cookies, proceed with b50 data fetching
-                friend_detail_url = f"https://maimaidx-eng.com/maimai-mobile/friend/friendDetail/?idx={friend_code}"
-                async with session.get(friend_detail_url, allow_redirects=False) as resp:
-                    if resp.status == 200:
-                        yield event.plain_result("好友已添加，正在查询b50")
-                        # TODO: Fetch b50 data here
-                    elif resp.status == 302:
-                        # send invite
-                        invite_url = "https://maimaidx-eng.com/maimai-mobile/friend/search/invite/"
-                        async with session.get(invite_url) as resp_invite:
-                            if resp_invite.status == 200:
-                                html = await resp_invite.text()
-                                token_match = re.search(r'name="token" value="([^"]*)"', html)
-                                if token_match:
-                                    token = token_match.group(1)
-                                    invite_data = {
-                                        'idx': friend_code,
-                                        'token': token,
-                                        'invite': ''
-                                    }
-                                    async with session.post(invite_url, data=invite_data, allow_redirects=True) as resp_post:
-                                        yield event.plain_result("查找到已绑定的好友码但未添加好友，已发送申请，查看你的maimaiNET并通过来自BOT的好友申请，并发送/mai approved")
-                                else:
-                                    yield event.plain_result("无法获取邀请令牌")
-                            else:
-                                yield event.plain_result("无法访问邀请页面")
-                    else:
-                        yield event.plain_result("检查好友状态失败")
+                # Start with fetching friend profile to verify friend status
+                friend_bio_url = f"https://maimaidx-eng.com/maimai-mobile/friend/friendDetail/?idx={friend_code}"
+                # TODO: checking if friend is already added or not, if not, add friend using friend code, then fetch b50 data. If already added, directly fetch b50 data. This is because maimai's API for fetching b50 data requires the target player to be in the friend list. 
+                
+                # yield event.plain_result("[DEBUG] 准备获取B50数据")
+                # TODO: Fetch b50 data here
                 
             except Exception as e:
                 yield event.plain_result(f"登录出错: {str(e)}")
         
-            
+        
         # code for image generation here
         # chain= [
         #     Comp.At(qq=event.get_sender_id()),
