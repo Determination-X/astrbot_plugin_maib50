@@ -146,8 +146,8 @@ MUNET munet MuNET""")
         if len(event.message_str.split()) < 3:
             yield event.plain_result("参数错误！请使用 /mai bind <服务器> <好友码> 的格式进行绑定喵")
             return
-        if len(friend_code) != 13 or not friend_code.isdigit():
-            yield event.plain_result("好友码输错了喵！好友码应该是13位数字")
+        if not friend_code.isdigit():
+            yield event.plain_result("好友码输错了喵！好友码应该是纯数字")
             return
         normalized_server = self._normalize_server(server)
         if not normalized_server:
