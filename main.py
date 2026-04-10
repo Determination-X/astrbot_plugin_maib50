@@ -426,7 +426,7 @@ MUNET munet MuNET""")
         """调试指令，输出调试信息，发布前会删除"""
         if debug_flag == "toggle":
             self.debug_mode = not self.debug_mode
-            yield event.plain_result(f"调试模式已 {'开启' if self.debug_mode else '关闭'}")
+            yield event.plain_result(f"调试模式已{'开启' if self.debug_mode else '关闭'}")
         elif debug_flag == "status":
             yield event.plain_result(f"调试模式当前状态: {'开启' if self.debug_mode else '关闭'}")
         elif debug_flag == "on":
