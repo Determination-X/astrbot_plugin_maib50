@@ -2,9 +2,10 @@ from astrbot.api.event import filter, AstrMessageEvent
 import astrbot.api.message_components as Comp
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
-import aiohttp# 异步HTTP请求库，用于向maimai net爬取数据
-import os 
-import sqlite3 # 存储绑定信息的数据库
+import aiohttp  # 异步HTTP请求库，用于向maimai net爬取数据
+import os
+import re
+import sqlite3  # 存储绑定信息的数据库
 import pickle
 from pathlib import Path
 
@@ -123,6 +124,13 @@ class MaiPlugin(Star):
         if not self.debug_mode:
             return
         yield event.plain_result(f"[DEBUG] {message}")
+
+    def _extract_token_from_html(self, html: str) -> str | None:
+        match = re.search(r'<input[^>]+name=["\']token["\'][^>]*value=["\']([^"\']+)["\']', html, re.I)
+        if match:
+            return match.group(1)
+        match = re.search(r'<input[^>]+value=["\']([^"\']+)["\'][^>]*name=["\']token["\']', html, re.I)
+        return match.group(1) if match else None
 
     @filter.command_group("mai")
     async def mai(self):
@@ -396,8 +404,65 @@ MUNET munet MuNET""")
                 # At this point, session has valid cookies, proceed with b50 data fetching
                 # Start with fetching friend profile to verify friend status
                 friend_bio_url = f"https://maimaidx-eng.com/maimai-mobile/friend/friendDetail/?idx={friend_code}"
-                # TODO: 1. checking if friend is already added or not, if not, add friend using friend code, then fetch b50 data. If already added, directly fetch b50 data. This is because maimai's API for fetching b50 data requires the target player to be in the friend list. 
-                
+                async with session.get(friend_bio_url, headers=get_headers, allow_redirects=False) as friend_resp:
+                    async for debug_msg in self._debug(event, f"friendDetail GET status: {friend_resp.status}, url={friend_resp.url}"):
+                        yield debug_msg
+                    if friend_resp.status == 200:
+                        async for debug_msg in self._debug(event, "目标好友已在好友列表中，直接继续获取B50数据"):
+                            yield debug_msg
+                    else:
+                        # Not a current friend: try to send a friend request using friendCode search and invite
+                        friend_search_url = f"https://maimaidx-eng.com/maimai-mobile/friend/search/searchUser/?friendCode={friend_code}"
+                        async with session.get(friend_search_url, headers={**get_headers, 'Referer': friend_bio_url}) as search_resp:
+                            async for debug_msg in self._debug(event, f"friend search status: {search_resp.status}, url={search_resp.url}"):
+                                yield debug_msg
+                            if search_resp.status != 200:
+                                yield event.plain_result(f"获取好友搜索页面失败，状态码: {search_resp.status}")
+                                return
+                            search_html = await search_resp.text()
+                        token = self._extract_token_from_html(search_html)
+                        if not token:
+                            yield event.plain_result("未能在好友搜索页面解析到 token，无法发送好友请求")
+                            return
+                        invite_url = "https://maimaidx-eng.com/maimai-mobile/friend/search/invite/"
+                        invite_headers = {
+                            'User-Agent': get_headers['User-Agent'],
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                            'Accept-Language': get_headers['Accept-Language'],
+                            'Accept-Encoding': get_headers['Accept-Encoding'],
+                            'Cache-Control': 'max-age=0',
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'Origin': 'https://maimaidx-eng.com',
+                            'Referer': friend_search_url,
+                            'Upgrade-Insecure-Requests': '1',
+                            'Sec-Fetch-Dest': 'document',
+                            'Sec-Fetch-Mode': 'navigate',
+                            'Sec-Fetch-Site': 'same-origin',
+                            'Sec-Fetch-User': '?1',
+                            'Sec-Ch-Ua': get_headers['Sec-Ch-Ua'],
+                            'Sec-Ch-Ua-Mobile': get_headers['Sec-Ch-Ua-Mobile'],
+                            'Sec-Ch-Ua-Platform': get_headers['Sec-Ch-Ua-Platform'],
+                        }
+                        invite_data = {
+                            'idx': friend_code,
+                            'token': token,
+                            'invite': ''
+                        }
+                        async with session.post(invite_url, data=invite_data, headers=invite_headers, allow_redirects=False) as invite_resp:
+                            async for debug_msg in self._debug(event, f"invite POST status: {invite_resp.status}, url={invite_resp.url}"):
+                                yield debug_msg
+                            if invite_resp.status in (302, 303):
+                                location = invite_resp.headers.get('Location', '')
+                                async for debug_msg in self._debug(event, f"好友请求已发送，跳转到: {location}"):
+                                    yield debug_msg
+                                yield event.plain_result("未添加好友，已发送好友请求，请等待对方批准")
+                                return
+                            invite_text = await invite_resp.text()
+                            if 'already' in invite_text.lower() or '已添加' in invite_text or '请求已发送' in invite_text:
+                                yield event.plain_result("好友已存在或好友请求已发送，请确认后再试")
+                                return
+                            yield event.plain_result(f"发送好友请求失败，状态码: {invite_resp.status}")
+                            return
 
                 # yield event.plain_result("[DEBUG] 准备获取B50数据")
                 # TODO: 2. Fetch b50 data here
