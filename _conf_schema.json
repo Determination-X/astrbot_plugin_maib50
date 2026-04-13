@@ -2,7 +2,7 @@
   "INT": {
     "description": "国际服BOT账号设置",
     "type": "object",
-    "hint": "B50国际服需要登录账号才能使用好友码查询，请在下方填写BOT账号的SID和密码",
+    "hint": "国际服B50需要登录账号才能使用好友码查询，请在下方填写BOT账号的SID和密码",
     "items": {
       "BOT_SID": {
         "description": "BOT账号SEGA ID",
