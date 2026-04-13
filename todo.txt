@@ -1,0 +1,6 @@
+bot login [check]
+bind friend code to qqid [check]
+check friend status []
+add friend []
+remove friend []
+fetch data from friend []
