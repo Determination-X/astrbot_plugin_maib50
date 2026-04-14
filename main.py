@@ -6,8 +6,7 @@ import aiohttp  # 异步HTTP请求库，用于向maimai net爬取数据
 import os
 import re
 import sqlite3  # 存储绑定信息的数据库
-import pickle
-from pathlib import Path
+import pickle # 用于保存和加载cookies
 
 plugin_name = "astrbot_plugin_maib50"
 help_text = """/mai可用指令:
