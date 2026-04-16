@@ -1,15 +1,15 @@
-from datetime import datetime, timezone, timedelta
-from bs4 import BeautifulSoup  # 用于解析HTML
-
-from astrbot.api.event import filter, AstrMessageEvent
-import astrbot.api.message_components as Comp
-from astrbot.api.star import Context, Star, register
-from astrbot.api import logger, AstrBotConfig
-import aiohttp  # 异步HTTP请求库，用于向maimai net爬取数据
 import os
+import pickle  # 用于保存和加载cookies
 import re
 import sqlite3  # 存储绑定信息的数据库
-import pickle  # 用于保存和加载cookies
+from datetime import datetime, timedelta, timezone
+
+import aiohttp  # 异步HTTP请求库，用于向maimai net爬取数据
+from bs4 import BeautifulSoup  # 用于解析HTML
+
+from astrbot.api import AstrBotConfig, logger
+from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.star import Context, Star, register
 
 plugin_name = "astrbot_plugin_maib50"
 help_text = """/mai可用指令:
@@ -760,11 +760,36 @@ MUNET munet MuNET""")
                             )
                             return
 
-                profile, entries = await self._fetch_friend_b50_data(
-                    session,
-                    friend_code,
-                    get_headers,
-                )
+                profile = None
+                entries = []
+                for diff_index in range(5):
+                    diff_name = DIFF_LABELS.get(diff_index, str(diff_index))
+                    async for debug_msg in self._debug(
+                        event, f"Fetching friend VS page for {diff_name}"
+                    ):
+                        yield debug_msg
+                    html = await self._fetch_friend_vs_page(
+                        session, friend_code, diff_index, get_headers
+                    )
+                    if profile is None:
+                        async for debug_msg in self._debug(
+                            event, "Parsing friend profile from first VS page"
+                        ):
+                            yield debug_msg
+                        profile = self._extract_friend_profile(html)
+                    async for debug_msg in self._debug(
+                        event, f"Parsing friend chart entries for {diff_name}"
+                    ):
+                        yield debug_msg
+                    parsed_entries = self._parse_friend_entries_from_html(
+                        html, diff_index
+                    )
+                    entries.extend(parsed_entries)
+                    async for debug_msg in self._debug(
+                        event,
+                        f"Parsed {len(parsed_entries)} charts for {diff_name} ({sum(not entry['unplayed'] for entry in parsed_entries)} played)",
+                    ):
+                        yield debug_msg
                 async for debug_msg in self._debug(
                     event,
                     f"Parsed {len(entries)} charts, {sum(not entry['unplayed'] for entry in entries)} played",
