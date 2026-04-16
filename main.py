@@ -223,7 +223,8 @@ class MaiPlugin(Star):
                 score_cells[-1].get_text()
             )
             kind_icon = card.select_one("img.music_kind_icon")
-            kind_src = kind_icon.get("src", "") if kind_icon else ""
+            raw_kind_src = kind_icon.get("src") if kind_icon else None
+            kind_src = raw_kind_src if isinstance(raw_kind_src, str) else ""
             if "music_standard" in kind_src:
                 chart_type = "STD"
             elif "music_dx" in kind_src:
