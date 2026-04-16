@@ -254,7 +254,7 @@ MUNET munet MuNET""")
             return
         self.conn.execute('DELETE FROM bindings WHERE qq_id = ?', (qq_id,))
         self.conn.commit()
-        yield event.plain_result("解绑成功")
+        yield event.plain_result("解绑成功，maimai DX NET上的好友关系需要你手动删除喵~(或者考虑找开发者催更一个自动删除好友的功能w)")
 
     @mai.command("b50")
     async def mai_b50(self, event: AstrMessageEvent):
