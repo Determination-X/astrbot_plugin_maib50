@@ -1,3 +1,7 @@
+import datetime
+import time
+from bs4 import BeautifulSoup # 用于解析HTML
+
 from astrbot.api.event import filter, AstrMessageEvent
 import astrbot.api.message_components as Comp
 from astrbot.api.star import Context, Star, register
@@ -157,17 +161,17 @@ MUNET munet MuNET""")
                           "國際服", "國服",
                           "International", "China", "Japan", "RinNET", "MuNET",
                           "JPN", "jpn"]:
-            yield event.plain_result("服务器输错了喵！请使用 INT、CN、RIN 或 MUNET 作为服务器参数")
+            yield event.plain_result("服务器输错了喵，请使用 INT、CN、RIN 或 MUNET 作为服务器参数")
             return
         if len(event.message_str.split()) < 3:
             yield event.plain_result("参数错误！请使用 /mai bind <服务器> <好友码> 的格式进行绑定喵")
             return
         if not friend_code.isdigit():
-            yield event.plain_result("好友码输错了喵！好友码应该是纯数字")
+            yield event.plain_result("好友码输错了喵，好友码应该是纯数字")
             return
         normalized_server = self._normalize_server(server)
         if not normalized_server:
-            yield event.plain_result("服务器输错了喵！请使用 INT、CN、RIN、JP 或 MUNET 作为服务器参数")
+            yield event.plain_result("服务器输错了喵，请使用 INT、CN、RIN、JP 或 MUNET 作为服务器参数")
             return
         if normalized_server != "INT":
             yield event.plain_result(f"{server} 的绑定功能正在开发喵~为什么不去找开发者催更呢w？")
@@ -226,7 +230,7 @@ MUNET munet MuNET""")
         if server:
             normalized_server = self._normalize_server(server)
             if not normalized_server:
-                yield event.plain_result("服务器输错了喵！请使用 INT、CN、RIN、JP 或 MUNET 作为服务器参数")
+                yield event.plain_result("服务器输错了喵，请使用 INT、CN、RIN、JP 或 MUNET 作为服务器参数")
                 return
             cursor.execute(
                 'SELECT friend_code FROM bindings WHERE qq_id = ? AND server = ?',
@@ -241,7 +245,7 @@ MUNET munet MuNET""")
                 (qq_id, normalized_server),
             )
             self.conn.commit()
-            yield event.plain_result(f"已解绑{normalized_server}好友码")
+            yield event.plain_result(f"已解绑{normalized_server}好友码，maimai DX NET上的好友关系需要你手动删除喵~(或者考虑找开发者催更一个自动删除好友的功能(挖坑+1...)")
             return
         cursor.execute('SELECT friend_code, server FROM bindings WHERE qq_id = ?', (qq_id,))
         row = cursor.fetchone()
@@ -259,12 +263,20 @@ MUNET munet MuNET""")
         bot_sid= self.sid
         bot_password= self.password
         if bot_sid == "":
-            yield event.plain_result("插件未配置BOT_SID，无法查询数据喵！请联系管理员配置好BOT_SID后再试喵！")
+            yield event.plain_result("插件未配置BOT_SID，无法查询数据，请联系管理员配置好BOT_SID后再试喵")
             return
         if bot_password == "":
-            yield event.plain_result("插件未配置BOT_PASSWORD，无法查询数据喵！请联系管理员配置好BOT_PASSWORD后再试喵！")
+            yield event.plain_result("插件未配置BOT_PASSWORD，无法查询数据，请联系管理员配置好BOT_PASSWORD后再试喵")
             return
         
+        # maimai DX NET Maintainance Time: Every Tuesday 2:00-6:00 UTC+9
+        current_utc_plus_9_time = time.time() + 9 * 3600
+        gmt_plus_9_struct = time.gmtime(current_utc_plus_9_time)
+        current_date_str = time.strftime("%h-%m", gmt_plus_9_struct)
+        if datetime.datetime.now().weekday() == 1 and "02-00" <= current_date_str <= "06-00":
+            yield event.plain_result("现在是每周二的维护时间（02:00-06:00 UTC+9），暂时无法查询数据，请在维护结束后再试喵")
+            return
+
         qq_id = event.get_sender_id()
         cursor = self.conn.cursor()
         cursor.execute(
@@ -464,13 +476,16 @@ MUNET munet MuNET""")
                             return
 
                 # yield event.plain_result("[DEBUG] 准备获取B50数据")
-                # TODO: 2. Fetch b50 data here
-                
+                # TODO: 2. Fetch b50 data here, we need BeautifulSoup here!
+
+            
             except Exception as e:
                 yield event.plain_result(f"登录出错: {str(e)}")
         
         
-        # code for image generation here
+        # code for image generation here, we need Pillow here!
+
+
         # chain= [
         #     Comp.At(qq=event.get_sender_id()),
         #     Comp.Plain(" 你的B50来了喵~"),
@@ -480,10 +495,6 @@ MUNET munet MuNET""")
         
     # @mai.command("search") 
     
-    #@filter.command_group("chu")
-    #async def chu(self, event: AstrMessageEvent):
-    #    pass
-
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("debug")
     async def debug(self, event: AstrMessageEvent, debug_flag: str="toggle"):
@@ -501,6 +512,10 @@ MUNET munet MuNET""")
             yield event.plain_result("调试模式已关闭")
         else:
             yield event.plain_result("无效的调试参数！使用 /debug toggle 切换调试模式，/debug status 查看当前状态")
+
+    #@filter.command_group("chu")
+    #async def chu(self, event: AstrMessageEvent):
+    #    pass
 
     @filter.command("chu")
     async def chu(self, event: AstrMessageEvent, keyword: str=""):
