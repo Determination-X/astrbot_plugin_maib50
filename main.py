@@ -1,5 +1,4 @@
-import datetime
-import time
+from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup # 用于解析HTML
 
 from astrbot.api.event import filter, AstrMessageEvent
@@ -270,12 +269,13 @@ MUNET munet MuNET""")
             return
         
         # maimai DX NET Maintainance Time: Every Tuesday 2:00-6:00 UTC+9
-        current_utc_plus_9_time = time.time() + 9 * 3600
-        gmt_plus_9_struct = time.gmtime(current_utc_plus_9_time)
-        current_date_str = time.strftime("%h-%m", gmt_plus_9_struct)
-        if datetime.datetime.now().weekday() == 1 and "02-00" <= current_date_str <= "06-00":
-            yield event.plain_result("现在是每周二的维护时间（02:00-06:00 UTC+9），暂时无法查询数据，请在维护结束后再试喵")
+        now_gmt9 = datetime.now(timezone(timedelta(hours=9)))
+
+        if now_gmt9.weekday() == 1 and 2 <= now_gmt9.hour < 6:
+            yield event.plain_result("现在是每周二的维护时间(02:00-06:00 UTC+9),暂时无法查询数据,请在维护结束后再试喵")
             return
+
+
 
         qq_id = event.get_sender_id()
         cursor = self.conn.cursor()
