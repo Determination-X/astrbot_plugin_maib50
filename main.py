@@ -3,6 +3,7 @@ import pickle  # 用于保存和加载cookies
 import re
 import sqlite3  # 存储绑定信息的数据库
 from datetime import datetime, timedelta, timezone
+from pathlib import Path  # 用于处理文件路径
 
 import aiohttp  # 异步HTTP请求库，用于向maimai net爬取数据
 from bs4 import BeautifulSoup  # 用于解析HTML
@@ -10,6 +11,7 @@ from bs4 import BeautifulSoup  # 用于解析HTML
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
+from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 plugin_name = "astrbot_plugin_maib50"
 help_text = """/mai可用指令:
@@ -51,10 +53,12 @@ class MaiPlugin(Star):
         ).get(
             "BOT_PASSWORD", ""
         )  # 从配置文件中获取 BOT_PASSWORD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
-        self.db_path = os.path.join("data", "plugin_data", plugin_name, "bindings.db")
-        self.cookies_path = os.path.join(
-            "data", "plugin_data", plugin_name, "cookies.pkl"
-        )
+        #self.db_path = os.path.join("data", "plugin_data", plugin_name, "bindings.db")
+        self.db_path = Path(get_astrbot_data_path()) / "plugin_data" / self.name / "bindings.db"
+        #self.cookies_path = os.path.join(
+        #    "data", "plugin_data", plugin_name, "cookies.pkl"
+        #)
+        self.cookies_path = Path(get_astrbot_data_path()) / "plugin_data" / self.name / "cookies.pkl"
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self._ensure_bindings_table()
@@ -285,7 +289,9 @@ class MaiPlugin(Star):
             entries.extend(self._parse_friend_entries_from_html(html, diff_index))
         return profile or {"name": "Unknown", "rating": "Unknown"}, entries
 
-    def _render_b50_summary(self, profile: dict, entries: list[dict]) -> str:
+    def _render_b50_summary(self, profile: dict | None, entries: list[dict]) -> str:
+        if profile is None:
+            return "Failed to retrieve friend profile information."
         played_entries = [entry for entry in entries if not entry["unplayed"]]
         played_entries.sort(key=lambda entry: entry["achievement"], reverse=True)
         top_entries = played_entries[:50]
