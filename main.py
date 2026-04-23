@@ -53,12 +53,16 @@ class MaiPlugin(Star):
         ).get(
             "BOT_PASSWORD", ""
         )  # 从配置文件中获取 BOT_PASSWORD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
-        #self.db_path = os.path.join("data", "plugin_data", plugin_name, "bindings.db")
-        self.db_path = Path(get_astrbot_data_path()) / "plugin_data" / self.name / "bindings.db"
-        #self.cookies_path = os.path.join(
+        # self.db_path = os.path.join("data", "plugin_data", plugin_name, "bindings.db")
+        self.db_path = (
+            Path(get_astrbot_data_path()) / "plugin_data" / self.name / "bindings.db"
+        )
+        # self.cookies_path = os.path.join(
         #    "data", "plugin_data", plugin_name, "cookies.pkl"
-        #)
-        self.cookies_path = Path(get_astrbot_data_path()) / "plugin_data" / self.name / "cookies.pkl"
+        # )
+        self.cookies_path = (
+            Path(get_astrbot_data_path()) / "plugin_data" / self.name / "cookies.pkl"
+        )
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self._ensure_bindings_table()
@@ -206,10 +210,10 @@ class MaiPlugin(Star):
     def _parse_friend_entries_from_html(self, html: str, diff_index: int) -> list[dict]:
         soup = BeautifulSoup(html, "html.parser")
         entries = []
-        for card in soup.select("div.music_expert_score_back"):
+        for card in soup.select('div[class*="_score_back"]'):
             title_node = card.select_one("div.music_name_block")
             level_node = card.select_one("div.music_lv_block")
-            score_cells = card.select("td.expert_score_label")
+            score_cells = card.select('td[class*="score_label"]')
             detail_cells = card.select("table tr:nth-of-type(2) td")
             if (
                 title_node is None
@@ -489,9 +493,9 @@ MUNET munet MuNET""")
             return
 
         # maimai DX NET Maintainance Time: Every Tuesday 2:00-6:00 UTC+9
-        #now_gmt9 = datetime.now(timezone(timedelta(hours=9)))
+        # now_gmt9 = datetime.now(timezone(timedelta(hours=9)))
 
-        #if now_gmt9.weekday() == 1 and 2 <= now_gmt9.hour < 6:
+        # if now_gmt9.weekday() == 1 and 2 <= now_gmt9.hour < 6:
         #    yield event.plain_result(
         #        "现在是每周二的维护时间(02:00-06:00 UTC+9),暂时无法查询数据,请在维护结束后再试喵"
         #    )
