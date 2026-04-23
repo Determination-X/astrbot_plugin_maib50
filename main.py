@@ -66,7 +66,6 @@ class MaiPlugin(Star):
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self._ensure_bindings_table()
-        self.debug_mode = False  # 是否开启调试模式，开启后会在查询过程中输出更多调试信息，方便开发和排查问题。发布前会关闭。
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
@@ -151,11 +150,6 @@ class MaiPlugin(Star):
         }
         return mapping.get(normalized)
 
-    async def _debug(self, event: AstrMessageEvent, message: str):
-        if not self.debug_mode:
-            return
-        yield event.plain_result(f"[DEBUG] {message}")
-
     def _extract_token_from_html(self, html: str) -> str | None:
         match = re.search(
             r'<input[^>]+name=["\']token["\'][^>]*value=["\']([^"\']+)["\']', html, re.I
@@ -215,17 +209,46 @@ class MaiPlugin(Star):
             level_node = card.select_one("div.music_lv_block")
             score_cells = card.select('td[class*="score_label"]')
             detail_cells = card.select("table tr:nth-of-type(2) td")
-            if (
-                title_node is None
-                or level_node is None
-                or len(score_cells) < 2
-                or len(detail_cells) < 2
-            ):
+            if title_node is None:
+                logger.warning(
+                    "Dropping score card for %s: missing title node. card_html=%s",
+                    DIFF_LABELS.get(diff_index, str(diff_index)),
+                    str(card),
+                )
+                continue
+            if level_node is None:
+                logger.warning(
+                    "Dropping score card for %s: missing level node. card_html=%s",
+                    DIFF_LABELS.get(diff_index, str(diff_index)),
+                    str(card),
+                )
+                continue
+            if len(score_cells) < 2:
+                logger.warning(
+                    "Dropping score card for %s: expected at least 2 score cells, got %s. card_html=%s",
+                    DIFF_LABELS.get(diff_index, str(diff_index)),
+                    len(score_cells),
+                    str(card),
+                )
                 continue
 
             title = self._normalize_whitespace(title_node.get_text())
             if not title:
+                logger.warning(
+                    "Dropping score card for %s: title is empty after normalization. raw_title=%r card_html=%s",
+                    DIFF_LABELS.get(diff_index, str(diff_index)),
+                    title_node.get_text(),
+                    str(card),
+                )
                 continue
+
+            if len(detail_cells) < 2:
+                logger.warning(
+                    "Score card for %s has fewer than 2 detail cells, icons will be empty. title=%r card_html=%s",
+                    DIFF_LABELS.get(diff_index, str(diff_index)),
+                    title,
+                    str(card),
+                )
 
             achievement, unplayed = self._parse_achievement_text(
                 score_cells[-1].get_text()
@@ -250,7 +273,9 @@ class MaiPlugin(Star):
                     "achievement": achievement,
                     "achievement_text": f"{achievement:.4f}%",
                     "unplayed": unplayed,
-                    "icons": self._extract_icon_names(detail_cells[-1]),
+                    "icons": self._extract_icon_names(detail_cells[-1])
+                    if len(detail_cells) >= 2
+                    else [],
                 }
             )
         return entries
@@ -515,11 +540,6 @@ MUNET munet MuNET""")
             return
         friend_code, server = row
 
-        async for debug_msg in self._debug(
-            event, f"SID= {bot_sid} , Friend Code= {friend_code}"
-        ):
-            yield debug_msg
-
         # Login using aiohttp
         login_url = "https://lng-tgk-aime-gw.am-all.net/common_auth/login/sid"
         login_data = {"retention": "1", "sid": bot_sid, "password": bot_password}
@@ -564,45 +584,38 @@ MUNET munet MuNET""")
                 # Try to load cached cookies first
                 cached_cookies = self._load_cookies()
                 needs_login = True
+                logger.debug("Starting /mai b50 lookup for friend_code=%s", friend_code)
 
                 if cached_cookies:
                     # Load cached cookies into session
                     session.cookie_jar._cookies = cached_cookies  # pyright: ignore[reportAttributeAccessIssue]
-                    async for debug_msg in self._debug(event, "使用缓存的cookies"):
-                        yield debug_msg
+                    logger.debug("Loaded cached cookies for /mai b50 lookup")
 
                     # Verify if cached cookies are still valid by making a test request
                     test_url = "https://maimaidx-eng.com/maimai-mobile/home"
                     async with session.get(
                         test_url, allow_redirects=False
                     ) as test_resp:
-                        async for debug_msg in self._debug(
-                            event, f"验证缓存cookies状态码: {test_resp.status}"
-                        ):
-                            yield debug_msg
+                        logger.debug(
+                            "Cached cookie validation returned status=%s",
+                            test_resp.status,
+                        )
                         if test_resp.status == 200:
-                            async for debug_msg in self._debug(
-                                event, "缓存cookies仍然有效，跳过登录"
-                            ):
-                                yield debug_msg
+                            logger.debug("Cached cookies are still valid")
                             needs_login = False
                         else:
-                            async for debug_msg in self._debug(
-                                event, "缓存cookies已过期，重新登录"
-                            ):
-                                yield debug_msg
+                            logger.info("Cached cookies expired, logging in again")
 
                 if needs_login:
-                    async for debug_msg in self._debug(event, "执行登录流程"):
-                        yield debug_msg
+                    logger.info("Executing maimai login flow for /mai b50")
 
                     # First, GET the login page to establish session
                     async with session.get(login_page_url, headers=get_headers) as resp:
-                        async for debug_msg in self._debug(
-                            event, f"GET status: {resp.status}"
-                        ):
-                            yield debug_msg
+                        logger.debug("Login page GET returned status=%s", resp.status)
                         if resp.status != 200:
+                            logger.error(
+                                "Failed to load login page, status=%s", resp.status
+                            )
                             yield event.plain_result(
                                 f"获取登录页面失败，状态码: {resp.status}"
                             )
@@ -616,24 +629,18 @@ MUNET munet MuNET""")
                         allow_redirects=True,
                     ) as resp:
                         final_url = str(resp.url)
-                        async for debug_msg in self._debug(
-                            event,
-                            f"POST Response status: {resp.status}, Final URL: {final_url}",
-                        ):
-                            yield debug_msg
-                        async for debug_msg in self._debug(
-                            event, f"History length: {len(resp.history)}"
-                        ):
-                            yield debug_msg
+                        logger.debug(
+                            "Login POST returned status=%s final_url=%s history_len=%s",
+                            resp.status,
+                            final_url,
+                            len(resp.history),
+                        )
 
                         # Check redirect history for ssid
                         ssid = None
                         for i, redirect_resp in enumerate(resp.history):
                             location = redirect_resp.headers.get("Location", "")
-                            async for debug_msg in self._debug(
-                                event, f"Redirect {i}: {location}"
-                            ):
-                                yield debug_msg
+                            logger.debug("Login redirect[%s]=%s", i, location)
                             if "ssid=" in location:
                                 ssid = (
                                     location.split("ssid=")[1].split("&")[0]
@@ -643,34 +650,25 @@ MUNET munet MuNET""")
                                 break
 
                         cookies = session.cookie_jar.filter_cookies(final_url)  # pyright: ignore[reportArgumentType]
-                        async for debug_msg in self._debug(
-                            event, f"Cookies: {dict(cookies)}"
-                        ):
-                            yield debug_msg
 
                         # Save cookies for future use
                         self._save_cookies(session.cookie_jar)
-                        async for debug_msg in self._debug(event, "cookies已保存"):
-                            yield debug_msg
+                        logger.debug("Saved cookies after successful login")
 
                         if ssid:
-                            async for debug_msg in self._debug(
-                                event, f"登录成功，SSID from redirect: {ssid}"
-                            ):
-                                yield debug_msg
+                            logger.info("Login succeeded with SSID from redirect")
                         elif cookies.get("ssid"):
-                            async for debug_msg in self._debug(
-                                event, "登录成功，SSID from cookie"
-                            ):
-                                yield debug_msg
+                            logger.info("Login succeeded with SSID from cookie")
                         elif (
                             final_url == "https://maimaidx-eng.com/maimai-mobile/home/"
                         ):
-                            async for debug_msg in self._debug(
-                                event, "登录成功，到达home页面"
-                            ):
-                                yield debug_msg
+                            logger.info("Login succeeded and reached maimai home page")
                         else:
+                            logger.error(
+                                "Login failed after POST, status=%s final_url=%s",
+                                resp.status,
+                                final_url,
+                            )
                             yield event.plain_result(f"登录失败，状态码: {resp.status}")
                             return
 
@@ -680,16 +678,13 @@ MUNET munet MuNET""")
                 async with session.get(
                     friend_bio_url, headers=get_headers, allow_redirects=False
                 ) as friend_resp:
-                    async for debug_msg in self._debug(
-                        event,
-                        f"friendDetail GET status: {friend_resp.status}, url={friend_resp.url}",
-                    ):
-                        yield debug_msg
+                    logger.debug(
+                        "friendDetail returned status=%s url=%s",
+                        friend_resp.status,
+                        friend_resp.url,
+                    )
                     if friend_resp.status == 200:
-                        async for debug_msg in self._debug(
-                            event, "目标好友已在好友列表中，直接继续获取B50数据"
-                        ):
-                            yield debug_msg
+                        logger.debug("Friend already exists in bot friend list")
                     else:
                         # Not a current friend: try to send a friend request using friendCode search and invite
                         friend_search_url = f"https://maimaidx-eng.com/maimai-mobile/friend/search/searchUser/?friendCode={friend_code}"
@@ -697,12 +692,16 @@ MUNET munet MuNET""")
                             friend_search_url,
                             headers={**get_headers, "Referer": friend_bio_url},
                         ) as search_resp:
-                            async for debug_msg in self._debug(
-                                event,
-                                f"friend search status: {search_resp.status}, url={search_resp.url}",
-                            ):
-                                yield debug_msg
+                            logger.debug(
+                                "friend search returned status=%s url=%s",
+                                search_resp.status,
+                                search_resp.url,
+                            )
                             if search_resp.status != 200:
+                                logger.error(
+                                    "Failed to load friend search page, status=%s",
+                                    search_resp.status,
+                                )
                                 yield event.plain_result(
                                     f"获取好友搜索页面失败，状态码: {search_resp.status}"
                                 )
@@ -740,17 +739,17 @@ MUNET munet MuNET""")
                             headers=invite_headers,
                             allow_redirects=False,
                         ) as invite_resp:
-                            async for debug_msg in self._debug(
-                                event,
-                                f"invite POST status: {invite_resp.status}, url={invite_resp.url}",
-                            ):
-                                yield debug_msg
+                            logger.debug(
+                                "invite POST returned status=%s url=%s",
+                                invite_resp.status,
+                                invite_resp.url,
+                            )
                             if invite_resp.status in (302, 303):
                                 location = invite_resp.headers.get("Location", "")
-                                async for debug_msg in self._debug(
-                                    event, f"好友请求已发送，跳转到: {location}"
-                                ):
-                                    yield debug_msg
+                                logger.info(
+                                    "Friend request sent successfully, redirect=%s",
+                                    location,
+                                )
                                 yield event.plain_result(
                                     "未添加好友，已发送好友请求，请等待对方批准"
                                 )
@@ -765,6 +764,10 @@ MUNET munet MuNET""")
                                     "好友已存在或好友请求已发送，请确认后再试"
                                 )
                                 return
+                            logger.error(
+                                "Failed to send friend request, status=%s",
+                                invite_resp.status,
+                            )
                             yield event.plain_result(
                                 f"发送好友请求失败，状态码: {invite_resp.status}"
                             )
@@ -774,41 +777,34 @@ MUNET munet MuNET""")
                 entries = []
                 for diff_index in range(5):
                     diff_name = DIFF_LABELS.get(diff_index, str(diff_index))
-                    async for debug_msg in self._debug(
-                        event, f"Fetching friend VS page for {diff_name}"
-                    ):
-                        yield debug_msg
+                    logger.debug("Fetching friend VS page for %s", diff_name)
                     html = await self._fetch_friend_vs_page(
                         session, friend_code, diff_index, get_headers
                     )
                     if profile is None:
-                        async for debug_msg in self._debug(
-                            event, "Parsing friend profile from first VS page"
-                        ):
-                            yield debug_msg
+                        logger.debug("Parsing friend profile from first VS page")
                         profile = self._extract_friend_profile(html)
-                    async for debug_msg in self._debug(
-                        event, f"Parsing friend chart entries for {diff_name}"
-                    ):
-                        yield debug_msg
+                    logger.debug("Parsing friend chart entries for %s", diff_name)
                     parsed_entries = self._parse_friend_entries_from_html(
                         html, diff_index
                     )
                     entries.extend(parsed_entries)
-                    async for debug_msg in self._debug(
-                        event,
-                        f"Parsed {len(parsed_entries)} charts for {diff_name} ({sum(not entry['unplayed'] for entry in parsed_entries)} played)",
-                    ):
-                        yield debug_msg
-                async for debug_msg in self._debug(
-                    event,
-                    f"Parsed {len(entries)} charts, {sum(not entry['unplayed'] for entry in entries)} played",
-                ):
-                    yield debug_msg
+                    logger.debug(
+                        "Parsed %s charts for %s (%s played)",
+                        len(parsed_entries),
+                        diff_name,
+                        sum(not entry["unplayed"] for entry in parsed_entries),
+                    )
+                logger.info(
+                    "Parsed %s charts total (%s played)",
+                    len(entries),
+                    sum(not entry["unplayed"] for entry in entries),
+                )
                 yield event.plain_result(self._render_b50_summary(profile, entries))
                 return
 
             except Exception as e:
+                logger.error("/mai b50 failed: %s", e, exc_info=True)
                 yield event.plain_result(f"登录出错: {str(e)}")
 
         # code for image generation here, we need Pillow here!
@@ -821,30 +817,6 @@ MUNET munet MuNET""")
         # yield event.chain_result(chain)
 
     # @mai.command("search")
-
-    @filter.permission_type(filter.PermissionType.ADMIN)
-    @filter.command("debug")
-    async def debug(self, event: AstrMessageEvent, debug_flag: str = "toggle"):
-        """调试指令，输出调试信息"""
-        if debug_flag == "toggle":
-            self.debug_mode = not self.debug_mode
-            yield event.plain_result(
-                f"调试模式已{'开启' if self.debug_mode else '关闭'}"
-            )
-        elif debug_flag == "status":
-            yield event.plain_result(
-                f"调试模式当前状态: {'开启' if self.debug_mode else '关闭'}"
-            )
-        elif debug_flag == "on":
-            self.debug_mode = True
-            yield event.plain_result("调试模式已开启")
-        elif debug_flag == "off":
-            self.debug_mode = False
-            yield event.plain_result("调试模式已关闭")
-        else:
-            yield event.plain_result(
-                "无效的调试参数！使用 /debug toggle 切换调试模式，/debug status 查看当前状态"
-            )
 
     # @filter.command_group("chu")
     # async def chu(self, event: AstrMessageEvent):
