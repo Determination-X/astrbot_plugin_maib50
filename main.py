@@ -2,7 +2,6 @@ import os
 import pickle  # 用于保存和加载cookies
 import re
 import sqlite3  # 存储绑定信息的数据库
-from datetime import datetime, timedelta, timezone
 from pathlib import Path  # 用于处理文件路径
 
 import aiohttp  # 异步HTTP请求库，用于向maimai net爬取数据
@@ -12,6 +11,8 @@ from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
+
+from .constant_table_manager import ConstantTableManager
 
 plugin_name = "astrbot_plugin_maib50"
 help_text = """/mai可用指令:
@@ -66,9 +67,36 @@ class MaiPlugin(Star):
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self._ensure_bindings_table()
+        self.constant_table_manager = ConstantTableManager()
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
+
+    async def _ensure_constant_table_loaded(self, session: aiohttp.ClientSession):
+        if self.constant_table_manager.entries:
+            return
+        logger.info("Constant table cache is empty, loading upstream data")
+        await self.constant_table_manager.refresh(session)
+
+    def _attach_constant_table_data(self, entries: list[dict]) -> list[dict]:
+        attached_entries = []
+        for entry in entries:
+            matches = self.constant_table_manager.find_by_title(entry["title"])
+            if not matches:
+                logger.warning(
+                    "No constant table match found for parsed entry title=%r",
+                    entry["title"],
+                )
+                attached_entries.append({**entry, "constant_table": None})
+                continue
+            if len(matches) > 1:
+                logger.warning(
+                    "Multiple constant table matches found for parsed entry title=%r count=%s",
+                    entry["title"],
+                    len(matches),
+                )
+            attached_entries.append({**entry, "constant_table": matches[0]})
+        return attached_entries
 
     def _load_cookies(self):
         """从文件加载保存的cookies"""
@@ -775,6 +803,7 @@ MUNET munet MuNET""")
 
                 profile = None
                 entries = []
+                await self._ensure_constant_table_loaded(session)
                 for diff_index in range(5):
                     diff_name = DIFF_LABELS.get(diff_index, str(diff_index))
                     logger.debug("Fetching friend VS page for %s", diff_name)
@@ -795,6 +824,7 @@ MUNET munet MuNET""")
                         diff_name,
                         sum(not entry["unplayed"] for entry in parsed_entries),
                     )
+                entries = self._attach_constant_table_data(entries)
                 logger.info(
                     "Parsed %s charts total (%s played)",
                     len(entries),
@@ -821,6 +851,20 @@ MUNET munet MuNET""")
     # @filter.command_group("chu")
     # async def chu(self, event: AstrMessageEvent):
     #    pass
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @mai.command("reload-constant-table")
+    async def reload_constant_table(self, event: AstrMessageEvent):
+        """管理员指令，强制刷新定数表数据"""
+        async with aiohttp.ClientSession() as session:
+            try:
+                entries = await self.constant_table_manager.refresh(session)
+                yield event.plain_result(
+                    f"定数表已刷新，当前共有 {len(entries)} 条记录"
+                )
+            except Exception as e:
+                logger.error("Failed to refresh constant table: %s", e, exc_info=True)
+                yield event.plain_result(f"刷新定数表失败: {str(e)}")
 
     @filter.command("chu")
     async def chu(self, event: AstrMessageEvent, keyword: str = ""):
