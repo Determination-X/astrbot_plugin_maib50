@@ -52,30 +52,27 @@ class MaiPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config  # 获取插件配置，配置文件路径为 `data/plugin_data/astrbot_plugin_maib50/config.json`，如果没有这个文件会自动创建一个空的配置文件。可以在这个配置文件里添加一些插件需要的配置项。
-        self.sid = self.config.get(
-            "INT", {}
-        ).get(
-            "BOT_SID", ""
-        )  # 从配置文件中获取 BOT_SID 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
-        self.password = self.config.get(
-            "INT", {}
-        ).get(
-            "BOT_PASSWORD", ""
-        )  # 从配置文件中获取 BOT_PASSWORD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
-        # self.db_path = os.path.join("data", "plugin_data", plugin_name, "bindings.db")
+        self.sid = self.config.get("INT", {}).get("BOT_SID", "")  # 从配置文件中获取 BOT_SID 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
+        self.password = self.config.get("INT", {}).get("BOT_PASSWORD", "")  # 从配置文件中获取 BOT_PASSWORD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
+        self.version_floor_threshold = self.config.get("INT", {}).get("VERSION_FLOOR_THRESHOLD", "")
+        
+        # Get constant table selection (default to INT if not specified)
+        self.constant_table_selection = self.config.get("INT", {}).get("CONSTANT_TABLE_SELECTION", "INT")
+        if self.constant_table_selection not in ("JP", "INT"):
+            logger.warning("Invalid CONSTANT_TABLE_SELECTION=%r, defaulting to INT", self.constant_table_selection)
+            self.constant_table_selection = "INT"
+
         self.db_path = (
             Path(get_astrbot_data_path()) / "plugin_data" / self.name / "bindings.db"
         )
-        # self.cookies_path = os.path.join(
-        #    "data", "plugin_data", plugin_name, "cookies.pkl"
-        # )
+
         self.cookies_path = (
             Path(get_astrbot_data_path()) / "plugin_data" / self.name / "cookies.pkl"
         )
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self._ensure_bindings_table()
-        self.constant_table_manager = ConstantTableManager()
+        self.constant_table_manager = ConstantTableManager(table_selection=self.constant_table_selection)
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
@@ -389,7 +386,7 @@ class MaiPlugin(Star):
         rated_entries.sort(
             key=lambda entry: (entry["rating"], entry["achievement"]), reverse=True
         )
-        current_version_floor = self._detect_current_version_floor(entries)
+        current_version_floor = self._get_current_version_floor(entries)
         new_entries = [
             entry
             for entry in rated_entries
@@ -507,7 +504,19 @@ class MaiPlugin(Star):
         if not version_numbers:
             return None
         latest_version = max(version_numbers)
-        return (latest_version // 100) * 100
+        return (latest_version // 1000) * 1000
+
+    def _get_current_version_floor(self, entries: list[dict]) -> int | None:
+        configured_value = self.version_floor_threshold
+        if configured_value not in (None, ""):
+            try:
+                return int(str(configured_value).strip())
+            except ValueError:
+                logger.warning(
+                    "Invalid VERSION_FLOOR_THRESHOLD=%r, fallback to auto detection",
+                    configured_value,
+                )
+        return self._detect_current_version_floor(entries)
 
     def _is_current_version_entry(
         self, entry: dict, current_version_floor: int | None
@@ -523,12 +532,12 @@ class MaiPlugin(Star):
     async def mai(self):
         pass
 
-    @mai.command("help", default=True)
+    @mai.command("help", default=True, alias={'?'})
     async def mai_help(self, event: AstrMessageEvent):
         """显示帮助信息"""
         yield event.plain_result(help_text)
 
-    @mai.command("bind")
+    @mai.command("bind", alias={'绑定'})
     async def mai_bind(
         self, event: AstrMessageEvent, server: str = "", friend_code: str = ""
     ):
@@ -618,7 +627,7 @@ MUNET munet MuNET""")
         yield event.plain_result(f"成功绑定国际服好友码：{friend_code}")
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @mai.command("view-all-binds")
+    @mai.command("view-all-binds", alias={'查看所有绑定', 'VAB'})
     async def mai_view_all_binds(self, event: AstrMessageEvent, force: str = ""):
         """管理员指令，查看所有绑定信息"""
         if event.get_group_id() != "" and force not in ["--force", "-f"]:
@@ -637,7 +646,7 @@ MUNET munet MuNET""")
             result += f"QQ ID: {qq_id}, 服务器: {server}, 好友码: {friend_code}\n"
         yield event.plain_result(result)
 
-    @mai.command("unbind")
+    @mai.command("unbind", alias={'解绑'})
     async def mai_unbind(self, event: AstrMessageEvent, server: str = ""):
         """解绑好友码"""
         qq_id = event.get_sender_id()
@@ -997,22 +1006,104 @@ MUNET munet MuNET""")
         # ]
         # yield event.chain_result(chain)
 
-    # @mai.command("search")
+    @mai.command("search", alias={'搜索'})
+    async def mai_search(self, event: AstrMessageEvent, keyword: str = ""):
+        """搜索maimai歌曲定数"""
+        if not keyword or keyword.strip() == "":
+            yield event.plain_result(
+                "请输入搜索关键词，例如: /mai search 朋友 或 /mai search lv 13"
+            )
+            return
+        
+        async with aiohttp.ClientSession() as session:
+            try:
+                await self._ensure_constant_table_loaded(session)
+                
+                # Search through entries
+                keyword_lower = keyword.lower()
+                matching_entries = []
+                
+                for entry in self.constant_table_manager.entries:
+                    title = entry.get("title", "").lower()
+                    # Search by title or version
+                    if keyword_lower in title or keyword_lower in entry.get("version", "").lower():
+                        matching_entries.append(entry)
+                
+                if not matching_entries:
+                    yield event.plain_result(
+                        f"未找到匹配 '{keyword}' 的歌曲喵~"
+                    )
+                    return
+                
+                # Sort by title
+                matching_entries.sort(key=lambda x: x.get("title", ""))
+                
+                # Format results (limit to first 20 to avoid spam)
+                result_lines = [
+                    f"找到 {len(matching_entries)} 首歌曲 (使用{self.constant_table_selection}定数表):"
+                ]
+                
+                for i, entry in enumerate(matching_entries[:20], 1):
+                    title = entry.get("title", "Unknown")
+                    version = entry.get("version", "Unknown")
+                    
+                    # Extract and display constants for all difficulties
+                    constants = []
+                    for diff_idx, diff_label in DIFF_LABELS.items():
+                        dx_key = f"dx_lev_{DIFF_CONSTANT_SUFFIX.get(diff_idx)}_i"
+                        std_key = f"lev_{DIFF_CONSTANT_SUFFIX.get(diff_idx)}_i"
+                        
+                        dx_const = entry.get(dx_key)
+                        std_const = entry.get(std_key)
+                        
+                        if std_const:
+                            constants.append(f"[{diff_label[:3]}] {std_const}")
+                        if dx_const:
+                            constants.append(f"[{diff_label[:3]}*] {dx_const}")
+                    
+                    const_str = " ".join(constants) if constants else "No data"
+                    result_lines.append(f"{i:2d}. {title} (v{version}) | {const_str}")
+                
+                if len(matching_entries) > 20:
+                    result_lines.append(f"... 还有 {len(matching_entries) - 20} 首歌曲")
+                
+                yield event.plain_result("\n".join(result_lines))
+                
+            except Exception as e:
+                logger.error("Search command failed: %s", e, exc_info=True)
+                yield event.plain_result(f"搜索出错: {str(e)}")
 
     # @filter.command_group("chu")
     # async def chu(self, event: AstrMessageEvent):
     #    pass
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @mai.command("reload-constant-table")
-    async def reload_constant_table(self, event: AstrMessageEvent):
-        """管理员指令，强制刷新定数表数据"""
+    @mai.command("reload-constant-table", alias={'reload-CT', '刷新定数表', 'RCT'})
+    async def reload_constant_table(self, event: AstrMessageEvent, selection: str = ""):
+        """管理员指令，强制刷新定数表数据，可选择表版本 (JP/INT)"""
+        # If selection is specified, switch to that table first
+        if selection:
+            selection_upper = selection.upper()
+            if selection_upper not in ("JP", "INT"):
+                yield event.plain_result(
+                    "无效的表版本，请使用 JP 或 INT"
+                )
+                return
+            try:
+                self.constant_table_manager.set_table_selection(selection_upper)
+                self.constant_table_selection = selection_upper
+                logger.info("Switched constant table to %s", selection_upper)
+            except ValueError as e:
+                yield event.plain_result(f"切换表版本失败: {str(e)}")
+                return
+        
         async with aiohttp.ClientSession() as session:
             try:
                 entries = await self.constant_table_manager.refresh(session)
                 yield event.plain_result(
-                    f"定数表已刷新，当前共有 {len(entries)} 条记录"
+                    f"定数表已刷新 (使用{self.constant_table_selection}版本)，当前共有 {len(entries)} 条记录"
                 )
+                logger.info("Constant table reloaded with %s version, %s entries loaded", self.constant_table_selection, len(entries))
             except Exception as e:
                 logger.error("Failed to refresh constant table: %s", e, exc_info=True)
                 yield event.plain_result(f"刷新定数表失败: {str(e)}")

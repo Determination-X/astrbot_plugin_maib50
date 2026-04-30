@@ -1,17 +1,27 @@
 {
-  "INT": {
-    "description": "国际服BOT账号设置",
-    "type": "object",
-    "hint": "国际服B50需要登录账号才能使用好友码查询，请在下方填写BOT账号的SID和密码",
-    "items": {
-      "BOT_SID": {
-        "description": "BOT账号SEGA ID",
-        "type": "string"
-      },
-      "BOT_PASSWORD": {
-        "description": "BOT账号密码",
-        "type": "string"
-      }
+    "INT": {
+        "description": "国际服BOT账号设置",
+        "type": "object",
+        "hint": "国际服B50需要登录账号才能使用好友码查询，请在下方填写BOT账号的SID和密码",
+        "items": {
+            "BOT_SID": {
+                "description": "BOT账号SEGA ID",
+                "type": "string"
+            },
+            "BOT_PASSWORD": {
+                "description": "BOT账号密码",
+                "type": "string"
+            },
+            "VERSION_FLOOR_THRESHOLD": {
+                "description": "B50新版本分段阈值（留空自动检测，示例：26000）",
+                "type": "string"
+            },
+            "CONSTANT_TABLE_SELECTION": {
+                "description": "定数表选择(预设为INT，选择JP将使用日服定数表，选择INT将使用国际服定数表)",
+                "type": "string",
+                "options": ["JP", "INT"],
+                "default": "INT"
+            }
+        }
     }
-  }
 }
