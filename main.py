@@ -88,23 +88,46 @@ class MaiPlugin(Star):
 
     def _attach_constant_table_data(self, entries: list[dict]) -> list[dict]:
         attached_entries = []
+        missing_titles: set[str] = set()
+        ambiguous_titles: set[str] = set()
         for entry in entries:
             matches = self.constant_table_manager.find_by_title(entry["title"])
             if not matches:
-                logger.warning(
-                    "No constant table match found for parsed entry title=%r",
-                    entry["title"],
-                )
+                if entry["title"] not in missing_titles:
+                    logger.warning(
+                        "No constant table match found for parsed entry title=%r",
+                        entry["title"],
+                    )
+                    missing_titles.add(entry["title"])
                 attached_entries.append({**entry, "constant_table": None})
                 continue
+            selected_match = self._select_best_constant_match(entry, matches)
             if len(matches) > 1:
-                logger.warning(
-                    "Multiple constant table matches found for parsed entry title=%r count=%s",
-                    entry["title"],
-                    len(matches),
-                )
-            attached_entries.append({**entry, "constant_table": matches[0]})
+                if entry["title"] not in ambiguous_titles:
+                    logger.warning(
+                        "Multiple constant table matches found for parsed entry title=%r count=%s",
+                        entry["title"],
+                        len(matches),
+                    )
+                    ambiguous_titles.add(entry["title"])
+            attached_entries.append({**entry, "constant_table": selected_match})
         return attached_entries
+
+    def _select_best_constant_match(self, entry: dict, matches: list[dict]) -> dict:
+        diff_suffix = DIFF_CONSTANT_SUFFIX.get(entry.get("difficulty_index", -1))
+        if not diff_suffix:
+            return matches[0]
+        if entry.get("type") == "DX":
+            candidate_keys = [f"dx_lev_{diff_suffix}_i", f"lev_{diff_suffix}_i"]
+        else:
+            candidate_keys = [f"lev_{diff_suffix}_i", f"dx_lev_{diff_suffix}_i"]
+
+        for key in candidate_keys:
+            for match in matches:
+                value = match.get(key)
+                if value not in (None, ""):
+                    return match
+        return matches[0]
 
     def _load_cookies(self):
         """从文件加载保存的cookies"""

@@ -1,8 +1,9 @@
+import json
 import re
 
 import aiohttp
 
-from astrbot.api import logger
+# from astrbot.api import logger
 
 MUSIC_EX_URL = (
     "https://raw.githubusercontent.com/zvuc/otoge-db/master/maimai/data/music-ex.json"
@@ -28,10 +29,15 @@ class ConstantTableManager:
             async with aiohttp.ClientSession() as owned_session:
                 return await self.refresh(owned_session)
 
-        logger.debug("Fetching maimai constant table from %s", self.source_url)
+        # logger.debug("Fetching maimai constant table from %s", self.source_url)
         async with session.get(self.source_url) as response:
             response.raise_for_status()
-            payload = await response.json()
+            payload_text = await response.text()
+
+        try:
+            payload = json.loads(payload_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("Failed to decode music-ex.json payload") from exc
 
         if not isinstance(payload, list):
             raise TypeError("music-ex.json payload is not a list")
@@ -44,9 +50,10 @@ class ConstantTableManager:
         self._entries = extracted_entries
         self._title_index = {}
         for entry in extracted_entries:
-            self._title_index.setdefault(entry["title"], []).append(entry)
+            title = entry["title"]
+            self._title_index.setdefault(title, []).append(entry)
 
-        logger.info("Loaded %s constant table entries", len(extracted_entries))
+        # logger.info("Loaded %s constant table entries", len(extracted_entries))
         return extracted_entries
 
     def find_by_title(self, title: str) -> list[dict[str, str]]:
