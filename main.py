@@ -38,7 +38,7 @@ DIFF_LABELS = {
 }
 
 
-@register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "0.0.1")
+@register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "0.0.2")
 class MaiPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
