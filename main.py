@@ -38,6 +38,14 @@ DIFF_LABELS = {
     4: "Re:MASTER",
 }
 
+DIFF_CONSTANT_SUFFIX = {
+    0: "bas",
+    1: "adv",
+    2: "exp",
+    3: "mas",
+    4: "remas",
+}
+
 
 @register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "0.0.2")
 class MaiPlugin(Star):
@@ -349,24 +357,144 @@ class MaiPlugin(Star):
     def _render_b50_summary(self, profile: dict | None, entries: list[dict]) -> str:
         if profile is None:
             return "Failed to retrieve friend profile information."
+        rated_entries = [
+            rated_entry
+            for entry in entries
+            for rated_entry in [self._build_rated_entry(entry)]
+            if rated_entry is not None
+        ]
+        rated_entries.sort(
+            key=lambda entry: (entry["rating"], entry["achievement"]), reverse=True
+        )
+        current_version_floor = self._detect_current_version_floor(entries)
+        new_entries = [
+            entry
+            for entry in rated_entries
+            if self._is_current_version_entry(entry, current_version_floor)
+        ]
+        old_entries = [
+            entry
+            for entry in rated_entries
+            if not self._is_current_version_entry(entry, current_version_floor)
+        ]
+        new_top = new_entries[:15]
+        old_top = old_entries[:35]
+        top_entries = new_top + old_top
+        total_rating = sum(entry["rating"] for entry in top_entries)
         played_entries = [entry for entry in entries if not entry["unplayed"]]
-        played_entries.sort(key=lambda entry: entry["achievement"], reverse=True)
-        top_entries = played_entries[:50]
         unplayed_count = len(entries) - len(played_entries)
 
         lines = [
             f"{profile['name']} (Rating: {profile['rating']})",
             f"Played charts: {len(played_entries)} / {len(entries)}",
             f"Unplayed charts excluded: {unplayed_count}",
-            f"Top {len(top_entries)} charts by achievement:",
+            f"Current-version floor: {current_version_floor if current_version_floor is not None else 'Unknown'}",
+            f"B50 total rating: {total_rating} (New {len(new_top)}/15 + Old {len(old_top)}/35)",
+            f"Top {len(top_entries)} charts by rating:",
         ]
         for index, entry in enumerate(top_entries, start=1):
             lines.append(
-                f"{index:02d}. [{entry['difficulty']}] {entry['title']} | {entry['type']} {entry['level']} | {entry['achievement_text']}"
+                f"{index:02d}. [{entry['difficulty']}] {entry['title']} | {entry['type']} {entry['level']} | {entry['achievement_text']} | c{entry['chart_constant']:.1f} x {entry['rank_factor']:.1f} => {entry['rating']}"
             )
         if not top_entries:
-            lines.append("No played charts found for this friend.")
+            lines.append(
+                "No rated charts found for this friend (missing constants or low achievements)."
+            )
         return "\n".join(lines)
+
+    def _get_rank_factor(self, achievement: float) -> float:
+        if achievement >= 100.5:
+            return 22.4
+        if achievement >= 100.0:
+            return 21.6
+        if achievement >= 99.5:
+            return 21.1
+        if achievement >= 99.0:
+            return 20.8
+        if achievement >= 98.0:
+            return 20.3
+        if achievement >= 97.0:
+            return 20.0
+        if achievement >= 94.0:
+            return 16.8
+        if achievement >= 90.0:
+            return 15.2
+        if achievement >= 80.0:
+            return 13.6
+        return 0.0
+
+    def _extract_chart_constant(self, entry: dict) -> float | None:
+        constant_table = entry.get("constant_table")
+        if not constant_table:
+            return None
+        diff_suffix = DIFF_CONSTANT_SUFFIX.get(entry.get("difficulty_index", -1))
+        if not diff_suffix:
+            return None
+        chart_type = entry.get("type", "")
+        if chart_type == "DX":
+            candidate_keys = [f"dx_lev_{diff_suffix}_i", f"lev_{diff_suffix}_i"]
+        else:
+            candidate_keys = [f"lev_{diff_suffix}_i", f"dx_lev_{diff_suffix}_i"]
+        for key in candidate_keys:
+            raw_value = constant_table.get(key)
+            if raw_value in (None, ""):
+                continue
+            try:
+                return float(raw_value)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Invalid constant value %r for key=%s title=%r",
+                    raw_value,
+                    key,
+                    entry.get("title"),
+                )
+        return None
+
+    def _build_rated_entry(self, entry: dict) -> dict | None:
+        if entry.get("unplayed"):
+            return None
+        chart_constant = self._extract_chart_constant(entry)
+        if chart_constant is None:
+            return None
+        achievement = float(entry.get("achievement", 0.0))
+        capped_achievement = min(achievement, 100.5)
+        rank_factor = self._get_rank_factor(capped_achievement)
+        if rank_factor <= 0.0:
+            return None
+        rating = int((capped_achievement / 100.0) * rank_factor * chart_constant)
+        return {
+            **entry,
+            "chart_constant": chart_constant,
+            "rank_factor": rank_factor,
+            "rating": rating,
+            "version": str((entry.get("constant_table") or {}).get("version", "")),
+        }
+
+    def _detect_current_version_floor(self, entries: list[dict]) -> int | None:
+        version_numbers = []
+        for entry in entries:
+            constant_table = entry.get("constant_table")
+            if not constant_table:
+                continue
+            version_raw = constant_table.get("version", "")
+            try:
+                version_numbers.append(int(str(version_raw)))
+            except ValueError:
+                continue
+        if not version_numbers:
+            return None
+        latest_version = max(version_numbers)
+        return (latest_version // 100) * 100
+
+    def _is_current_version_entry(
+        self, entry: dict, current_version_floor: int | None
+    ) -> bool:
+        if current_version_floor is None:
+            return False
+        try:
+            return int(entry.get("version", "0")) >= current_version_floor
+        except ValueError:
+            return False
 
     @filter.command_group("mai")
     async def mai(self):
