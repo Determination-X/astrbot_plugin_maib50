@@ -54,8 +54,8 @@ class MaiPlugin(Star):
         self.config = config  # 获取插件配置，配置文件路径为 `data/plugin_data/astrbot_plugin_maib50/config.json`，如果没有这个文件会自动创建一个空的配置文件。可以在这个配置文件里添加一些插件需要的配置项。
         self.sid = self.config.get("INT", {}).get("BOT_SID", "")  # 从配置文件中获取 BOT_SID 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
         self.password = self.config.get("INT", {}).get("BOT_PASSWORD", "")  # 从配置文件中获取 BOT_PASSWORD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
-        self.version_floor_threshold = self.config.get("INT", {}).get("VERSION_FLOOR_THRESHOLD", "")
-        
+        self.version_floor_threshold = self.config.get("INT", {}).get("VERSION_FLOOR_THRESHOLD", "") # 从配置文件中获取 VERSION_FLOOR_THRESHOLD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。这个配置项用于指定版本底线，只有常数表版本号大于等于这个底线的谱面才会被算入New15评分计算，否则会被当做旧谱面处理为Old35。这个配置项主要是为了应对常数表更新滞后于游戏版本更新的情况，允许管理员手动指定一个版本底线来区分新旧谱面。如果这个配置项设置为一个有效的整数值（比如23000），则版本号大于等于这个值的谱面会被算入New15评分计算；如果这个配置项设置为一个无效值或者留空，则插件会尝试自动检测当前版本底线，自动检测的方法是找出所有好友谱面中常数表版本号的最大值，然后向下取整到最近的千位数作为版本底线（比如如果最大版本号是23145，则版本底线会被自动设定为23000）。需要注意的是，如果常数表数据严重滞后导致无法正确检测出当前版本底线，可能会导致新旧谱面划分错误，从而影响评分计算结果，因此建议管理员根据实际情况合理设置这个配置项。
+
         # Get constant table selection (default to INT if not specified)
         self.constant_table_selection = self.config.get("INT", {}).get("CONSTANT_TABLE_SELECTION", "INT")
         if self.constant_table_selection not in ("JP", "INT"):
@@ -399,8 +399,7 @@ class MaiPlugin(Star):
         ]
         new_top = new_entries[:15]
         old_top = old_entries[:35]
-        top_entries = new_top + old_top
-        total_rating = sum(entry["rating"] for entry in top_entries)
+        total_rating = sum(entry["rating"] for entry in new_top + old_top)
         played_entries = [entry for entry in entries if not entry["unplayed"]]
         unplayed_count = len(entries) - len(played_entries)
 
@@ -410,13 +409,26 @@ class MaiPlugin(Star):
             f"Unplayed charts excluded: {unplayed_count}",
             f"Current-version floor: {current_version_floor if current_version_floor is not None else 'Unknown'}",
             f"B50 total rating: {total_rating} (New {len(new_top)}/15 + Old {len(old_top)}/35)",
-            f"Top {len(top_entries)} charts by rating:",
+            "=== New15 ===",
         ]
-        for index, entry in enumerate(top_entries, start=1):
-            lines.append(
-                f"{index:02d}. [{entry['difficulty']}] {entry['title']} | {entry['type']} {entry['level']} | {entry['achievement_text']} | c{entry['chart_constant']:.1f} x {entry['rank_factor']:.1f} => {entry['rating']}"
-            )
-        if not top_entries:
+        if new_top:
+            for index, entry in enumerate(new_top, start=1):
+                lines.append(
+                    f"{index:02d}. [{entry['difficulty']}] {entry['title']} | {entry['type']} {entry['level']} | {entry['achievement_text']} | c{entry['chart_constant']:.1f} x {entry['rank_factor']:.1f} => {entry['rating']}"
+                )
+        else:
+            lines.append("No current-version charts found in New15 selection.")
+
+        lines.append("=== Old35 ===")
+        if old_top:
+            for index, entry in enumerate(old_top, start=1):
+                lines.append(
+                    f"{index:02d}. [{entry['difficulty']}] {entry['title']} | {entry['type']} {entry['level']} | {entry['achievement_text']} | c{entry['chart_constant']:.1f} x {entry['rank_factor']:.1f} => {entry['rating']}"
+                )
+        else:
+            lines.append("No old-version charts found in Old35 selection.")
+
+        if not new_top and not old_top:
             lines.append(
                 "No rated charts found for this friend (missing constants or low achievements)."
             )
@@ -1014,61 +1026,61 @@ MUNET munet MuNET""")
                 "请输入搜索关键词，例如: /mai search 朋友 或 /mai search lv 13"
             )
             return
-        
+
         async with aiohttp.ClientSession() as session:
             try:
                 await self._ensure_constant_table_loaded(session)
-                
+
                 # Search through entries
                 keyword_lower = keyword.lower()
                 matching_entries = []
-                
+
                 for entry in self.constant_table_manager.entries:
                     title = entry.get("title", "").lower()
                     # Search by title or version
                     if keyword_lower in title or keyword_lower in entry.get("version", "").lower():
                         matching_entries.append(entry)
-                
+
                 if not matching_entries:
                     yield event.plain_result(
                         f"未找到匹配 '{keyword}' 的歌曲喵~"
                     )
                     return
-                
+
                 # Sort by title
                 matching_entries.sort(key=lambda x: x.get("title", ""))
-                
+
                 # Format results (limit to first 20 to avoid spam)
                 result_lines = [
                     f"找到 {len(matching_entries)} 首歌曲 (使用{self.constant_table_selection}定数表):"
                 ]
-                
+
                 for i, entry in enumerate(matching_entries[:20], 1):
                     title = entry.get("title", "Unknown")
                     version = entry.get("version", "Unknown")
-                    
+
                     # Extract and display constants for all difficulties
                     constants = []
                     for diff_idx, diff_label in DIFF_LABELS.items():
                         dx_key = f"dx_lev_{DIFF_CONSTANT_SUFFIX.get(diff_idx)}_i"
                         std_key = f"lev_{DIFF_CONSTANT_SUFFIX.get(diff_idx)}_i"
-                        
+
                         dx_const = entry.get(dx_key)
                         std_const = entry.get(std_key)
-                        
+
                         if std_const:
                             constants.append(f"[{diff_label[:3]}] {std_const}")
                         if dx_const:
                             constants.append(f"[{diff_label[:3]}*] {dx_const}")
-                    
+
                     const_str = " ".join(constants) if constants else "No data"
                     result_lines.append(f"{i:2d}. {title} (v{version}) | {const_str}")
-                
+
                 if len(matching_entries) > 20:
                     result_lines.append(f"... 还有 {len(matching_entries) - 20} 首歌曲")
-                
+
                 yield event.plain_result("\n".join(result_lines))
-                
+
             except Exception as e:
                 logger.error("Search command failed: %s", e, exc_info=True)
                 yield event.plain_result(f"搜索出错: {str(e)}")
@@ -1096,7 +1108,7 @@ MUNET munet MuNET""")
             except ValueError as e:
                 yield event.plain_result(f"切换表版本失败: {str(e)}")
                 return
-        
+
         async with aiohttp.ClientSession() as session:
             try:
                 entries = await self.constant_table_manager.refresh(session)
