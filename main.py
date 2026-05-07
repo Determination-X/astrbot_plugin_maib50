@@ -1,7 +1,6 @@
 import os
 import pickle  # 用于保存和加载cookies
 import re
-import json
 import sqlite3  # 存储绑定信息的数据库
 from pathlib import Path  # 用于处理文件路径
 
@@ -67,19 +66,12 @@ class MaiPlugin(Star):
             Path(get_astrbot_data_path()) / "plugin_data" / self.name / "bindings.db"
         )
 
-        self.plugin_data_path = (
-            Path(get_astrbot_data_path()) / "plugin_data" / self.name
-        )
-        os.makedirs(self.plugin_data_path, exist_ok=True)
-
         self.cookies_path = (
             Path(get_astrbot_data_path()) / "plugin_data" / self.name / "cookies.pkl"
         )
-
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self._ensure_bindings_table()
-
         self.constant_table_manager = ConstantTableManager(table_selection=self.constant_table_selection)
 
     async def initialize(self):
@@ -264,22 +256,6 @@ class MaiPlugin(Star):
             if rating_node
             else "Unknown",
         }
-
-    def _save_parser_debug_output(
-        self, friend_code: str, diff_index: int, parsed_entries: list[dict]
-    ) -> None:
-        try:
-            debug_dir = self.plugin_data_path / "debug_parser"
-            debug_dir.mkdir(parents=True, exist_ok=True)
-            debug_file = debug_dir / f"parser_return_{friend_code}_diff{diff_index}.json"
-            with open(debug_file, "w", encoding="utf-8") as f:
-                json.dump(parsed_entries, f, ensure_ascii=False, indent=2)
-            logger.info(
-                "Saved parser debug output to %s",
-                str(debug_file),
-            )
-        except Exception as e:
-            logger.warning("Failed to save parser debug output: %s", e)
 
     def _parse_friend_entries_from_html(self, html: str, diff_index: int) -> list[dict]:
         soup = BeautifulSoup(html, "html.parser")
@@ -1014,7 +990,6 @@ MUNET munet MuNET""")
                     parsed_entries = self._parse_friend_entries_from_html(
                         html, diff_index
                     )
-                    self._save_parser_debug_output(friend_code, diff_index, parsed_entries)
                     entries.extend(parsed_entries)
                     logger.debug(
                         "Parsed %s charts for %s (%s played)",
