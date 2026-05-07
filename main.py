@@ -409,7 +409,7 @@ class MaiPlugin(Star):
             f"Unplayed charts excluded: {unplayed_count}",
             f"Current-version floor: {current_version_floor if current_version_floor is not None else 'Unknown'}",
             f"B50 total rating: {total_rating} (New {len(new_top)}/15 + Old {len(old_top)}/35)",
-            "=== New15 ===",
+            "\n=== New15 ===",
         ]
         if new_top:
             for index, entry in enumerate(new_top, start=1):
@@ -419,7 +419,7 @@ class MaiPlugin(Star):
         else:
             lines.append("No current-version charts found in New15 selection.")
 
-        lines.append("=== Old35 ===")
+        lines.append("\n\n=== Old35 ===\n")
         if old_top:
             for index, entry in enumerate(old_top, start=1):
                 lines.append(
@@ -740,6 +740,7 @@ MUNET munet MuNET""")
             return
         friend_code, server = row
 
+        yield event.plain_result("正在查询数据，请稍候喵~")
         # Login using aiohttp
         login_url = "https://lng-tgk-aime-gw.am-all.net/common_auth/login/sid"
         login_data = {"retention": "1", "sid": bot_sid, "password": bot_password}
