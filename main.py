@@ -47,19 +47,36 @@ DIFF_CONSTANT_SUFFIX = {
 }
 
 
-@register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "0.0.2")
+# Deprecated    @register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "1.0.0")
 class MaiPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config  # 获取插件配置，配置文件路径为 `data/plugin_data/astrbot_plugin_maib50/config.json`，如果没有这个文件会自动创建一个空的配置文件。可以在这个配置文件里添加一些插件需要的配置项。
-        self.sid = self.config.get("INT", {}).get("BOT_SID", "")  # 从配置文件中获取 BOT_SID 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
-        self.password = self.config.get("INT", {}).get("BOT_PASSWORD", "")  # 从配置文件中获取 BOT_PASSWORD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
-        self.version_floor_threshold = self.config.get("INT", {}).get("VERSION_FLOOR_THRESHOLD", "") # 从配置文件中获取 VERSION_FLOOR_THRESHOLD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。这个配置项用于指定版本底线，只有常数表版本号大于等于这个底线的谱面才会被算入New15评分计算，否则会被当做旧谱面处理为Old35。这个配置项主要是为了应对常数表更新滞后于游戏版本更新的情况，允许管理员手动指定一个版本底线来区分新旧谱面。如果这个配置项设置为一个有效的整数值（比如23000），则版本号大于等于这个值的谱面会被算入New15评分计算；如果这个配置项设置为一个无效值或者留空，则插件会尝试自动检测当前版本底线，自动检测的方法是找出所有好友谱面中常数表版本号的最大值，然后向下取整到最近的千位数作为版本底线（比如如果最大版本号是23145，则版本底线会被自动设定为23000）。需要注意的是，如果常数表数据严重滞后导致无法正确检测出当前版本底线，可能会导致新旧谱面划分错误，从而影响评分计算结果，因此建议管理员根据实际情况合理设置这个配置项。
+        self.sid = self.config.get(
+            "INT", {}
+        ).get(
+            "BOT_SID", ""
+        )  # 从配置文件中获取 BOT_SID 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
+        self.password = self.config.get(
+            "INT", {}
+        ).get(
+            "BOT_PASSWORD", ""
+        )  # 从配置文件中获取 BOT_PASSWORD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。
+        self.version_floor_threshold = self.config.get(
+            "INT", {}
+        ).get(
+            "VERSION_FLOOR_THRESHOLD", ""
+        )  # 从配置文件中获取 VERSION_FLOOR_THRESHOLD 配置项的值，如果没有这个配置项或者值为空字符串，则默认为空字符串。这个配置项用于指定版本底线，只有常数表版本号大于等于这个底线的谱面才会被算入New15评分计算，否则会被当做旧谱面处理为Old35。这个配置项主要是为了应对常数表更新滞后于游戏版本更新的情况，允许管理员手动指定一个版本底线来区分新旧谱面。如果这个配置项设置为一个有效的整数值（比如23000），则版本号大于等于这个值的谱面会被算入New15评分计算；如果这个配置项设置为一个无效值或者留空，则插件会尝试自动检测当前版本底线，自动检测的方法是找出所有好友谱面中常数表版本号的最大值，然后向下取整到最近的千位数作为版本底线（比如如果最大版本号是23145，则版本底线会被自动设定为23000）。需要注意的是，如果常数表数据严重滞后导致无法正确检测出当前版本底线，可能会导致新旧谱面划分错误，从而影响评分计算结果，因此建议管理员根据实际情况合理设置这个配置项。
 
         # Get constant table selection (default to INT if not specified)
-        self.constant_table_selection = self.config.get("INT", {}).get("CONSTANT_TABLE_SELECTION", "INT")
+        self.constant_table_selection = self.config.get("INT", {}).get(
+            "CONSTANT_TABLE_SELECTION", "INT"
+        )
         if self.constant_table_selection not in ("JP", "INT"):
-            logger.warning("Invalid CONSTANT_TABLE_SELECTION=%r, defaulting to INT", self.constant_table_selection)
+            logger.warning(
+                "Invalid CONSTANT_TABLE_SELECTION=%r, defaulting to INT",
+                self.constant_table_selection,
+            )
             self.constant_table_selection = "INT"
 
         self.db_path = (
@@ -72,7 +89,9 @@ class MaiPlugin(Star):
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self._ensure_bindings_table()
-        self.constant_table_manager = ConstantTableManager(table_selection=self.constant_table_selection)
+        self.constant_table_manager = ConstantTableManager(
+            table_selection=self.constant_table_selection
+        )
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
@@ -544,12 +563,12 @@ class MaiPlugin(Star):
     async def mai(self):
         pass
 
-    @mai.command("help", default=True, alias={'?'})
+    @mai.command("help", default=True, alias={"?"})
     async def mai_help(self, event: AstrMessageEvent):
         """显示帮助信息"""
         yield event.plain_result(help_text)
 
-    @mai.command("bind", alias={'绑定'})
+    @mai.command("bind", alias={"绑定"})
     async def mai_bind(
         self, event: AstrMessageEvent, server: str = "", friend_code: str = ""
     ):
@@ -639,7 +658,7 @@ MUNET munet MuNET""")
         yield event.plain_result(f"成功绑定国际服好友码：{friend_code}")
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @mai.command("view-all-binds", alias={'查看所有绑定', 'VAB'})
+    @mai.command("view-all-binds", alias={"查看所有绑定", "VAB"})
     async def mai_view_all_binds(self, event: AstrMessageEvent, force: str = ""):
         """管理员指令，查看所有绑定信息"""
         if event.get_group_id() != "" and force not in ["--force", "-f"]:
@@ -658,7 +677,7 @@ MUNET munet MuNET""")
             result += f"QQ ID: {qq_id}, 服务器: {server}, 好友码: {friend_code}\n"
         yield event.plain_result(result)
 
-    @mai.command("unbind", alias={'解绑'})
+    @mai.command("unbind", alias={"解绑"})
     async def mai_unbind(self, event: AstrMessageEvent, server: str = ""):
         """解绑好友码"""
         qq_id = event.get_sender_id()
@@ -1019,7 +1038,7 @@ MUNET munet MuNET""")
         # ]
         # yield event.chain_result(chain)
 
-    @mai.command("search", alias={'搜索'})
+    @mai.command("search", alias={"搜索"})
     async def mai_search(self, event: AstrMessageEvent, keyword: str = ""):
         """搜索maimai歌曲定数"""
         if not keyword or keyword.strip() == "":
@@ -1039,13 +1058,14 @@ MUNET munet MuNET""")
                 for entry in self.constant_table_manager.entries:
                     title = entry.get("title", "").lower()
                     # Search by title or version
-                    if keyword_lower in title or keyword_lower in entry.get("version", "").lower():
+                    if (
+                        keyword_lower in title
+                        or keyword_lower in entry.get("version", "").lower()
+                    ):
                         matching_entries.append(entry)
 
                 if not matching_entries:
-                    yield event.plain_result(
-                        f"未找到匹配 '{keyword}' 的歌曲喵~"
-                    )
+                    yield event.plain_result(f"未找到匹配 '{keyword}' 的歌曲喵~")
                     return
 
                 # Sort by title
@@ -1091,16 +1111,14 @@ MUNET munet MuNET""")
     #    pass
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @mai.command("reload-constant-table", alias={'reload-CT', '刷新定数表', 'RCT'})
+    @mai.command("reload-constant-table", alias={"reload-CT", "刷新定数表", "RCT"})
     async def reload_constant_table(self, event: AstrMessageEvent, selection: str = ""):
         """管理员指令，强制刷新定数表数据，可选择表版本 (JP/INT)"""
         # If selection is specified, switch to that table first
         if selection:
             selection_upper = selection.upper()
             if selection_upper not in ("JP", "INT"):
-                yield event.plain_result(
-                    "无效的表版本，请使用 JP 或 INT"
-                )
+                yield event.plain_result("无效的表版本，请使用 JP 或 INT")
                 return
             try:
                 self.constant_table_manager.set_table_selection(selection_upper)
@@ -1116,7 +1134,11 @@ MUNET munet MuNET""")
                 yield event.plain_result(
                     f"定数表已刷新 (使用{self.constant_table_selection}版本)，当前共有 {len(entries)} 条记录"
                 )
-                logger.info("Constant table reloaded with %s version, %s entries loaded", self.constant_table_selection, len(entries))
+                logger.info(
+                    "Constant table reloaded with %s version, %s entries loaded",
+                    self.constant_table_selection,
+                    len(entries),
+                )
             except Exception as e:
                 logger.error("Failed to refresh constant table: %s", e, exc_info=True)
                 yield event.plain_result(f"刷新定数表失败: {str(e)}")

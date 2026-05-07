@@ -9,18 +9,21 @@ import aiohttp
 MUSIC_EX_URL = (
     "https://raw.githubusercontent.com/zvuc/otoge-db/master/maimai/data/music-ex.json"
 )
-MUSIC_EX_URL_INT = (
-    "https://raw.githubusercontent.com/zvuc/otoge-db/master/maimai/data/music-ex-intl.json"
-)
+MUSIC_EX_URL_INT = "https://raw.githubusercontent.com/zvuc/otoge-db/master/maimai/data/music-ex-intl.json"
 BASE_FIELDS = ("title", "version", "image_url")
 CONSTANT_FIELD_PATTERN = re.compile(r"^(?:dx_)?lev_(?:bas|adv|exp|mas|remas)_i$")
 
 
 class ConstantTableManager:
-    def __init__(self, source_url: str | None = None, source_url_int: str | None = None, table_selection: str = "INT"):
+    def __init__(
+        self,
+        source_url: str | None = None,
+        source_url_int: str | None = None,
+        table_selection: str = "INT",
+    ):
         """
         Initialize ConstantTableManager.
-        
+
         Args:
             source_url: URL for JP constant table (defaults to MUSIC_EX_URL)
             source_url_int: URL for INT constant table (defaults to MUSIC_EX_URL_INT)
@@ -32,12 +35,14 @@ class ConstantTableManager:
         self._entries: list[dict[str, str]] = []
         self._title_index: dict[str, list[dict[str, str]]] = {}
         self._normalized_title_index: dict[str, list[dict[str, str]]] = {}
-    
+
     def set_table_selection(self, selection: str) -> None:
         """Change the constant table selection ('JP' or 'INT')."""
         self.table_selection = selection.upper()
         if self.table_selection not in ("JP", "INT"):
-            raise ValueError(f"Invalid table selection: {selection}. Must be 'JP' or 'INT'")
+            raise ValueError(
+                f"Invalid table selection: {selection}. Must be 'JP' or 'INT'"
+            )
         # Clear cached entries when switching tables
         self._entries = []
         self._title_index = {}
@@ -59,11 +64,13 @@ class ConstantTableManager:
             selected_url = self.source_url  # JP table
         else:  # INT (default)
             selected_url = self.source_url_int  # INT table
-        
-        if not selected_url:
-            raise ValueError(f"No source URL configured for {self.table_selection} constant table")
 
-#       logger.debug("Fetching maimai constant table from %s (selection=%s)", selected_url, self.table_selection)
+        if not selected_url:
+            raise ValueError(
+                f"No source URL configured for {self.table_selection} constant table"
+            )
+
+        #       logger.debug("Fetching maimai constant table from %s (selection=%s)", selected_url, self.table_selection)
         async with session.get(selected_url) as response:
             response.raise_for_status()
             payload_text = await response.text()
@@ -93,7 +100,7 @@ class ConstantTableManager:
                     entry
                 )
 
-#        logger.info("Loaded %s constant table entries", len(extracted_entries))
+        #        logger.info("Loaded %s constant table entries", len(extracted_entries))
         return extracted_entries
 
     def find_by_title(self, title: str) -> list[dict[str, str]]:
