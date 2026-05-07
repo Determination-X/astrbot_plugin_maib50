@@ -535,7 +535,7 @@ class MaiPlugin(Star):
         if not version_numbers:
             return None
         latest_version = max(version_numbers)
-        return (latest_version // 1000) * 1000
+        return (latest_version // 500) * 500 - 500
 
     def _get_current_version_floor(self, entries: list[dict]) -> int | None:
         configured_value = self.version_floor_threshold

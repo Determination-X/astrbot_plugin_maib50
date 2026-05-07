@@ -13,7 +13,7 @@
                 "type": "string"
             },
             "VERSION_FLOOR_THRESHOLD": {
-                "description": "B50新版本分段阈值（留空自动检测，示例：26000）",
+                "description": "New15分段阈值（留空自动检测定数表版本）",
                 "type": "string"
             },
             "CONSTANT_TABLE_SELECTION": {
