@@ -1111,7 +1111,7 @@ MUNET munet MuNET""")
     #    pass
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @mai.command("reload-constant-table", alias={"reload-CT", "刷新定数表", "RCT"})
+    @mai.command("reload-constant-table", alias={"reload-CT", "rct", "刷新定数表", "RCT"})
     async def reload_constant_table(self, event: AstrMessageEvent, selection: str = ""):
         """管理员指令，强制刷新定数表数据，可选择表版本 (JP/INT)"""
         # If selection is specified, switch to that table first
