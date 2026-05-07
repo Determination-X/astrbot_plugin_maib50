@@ -1049,7 +1049,7 @@ MUNET munet MuNET""")
         """搜索maimai歌曲定数"""
         if not keyword or keyword.strip() == "":
             yield event.plain_result(
-                "请输入搜索关键词，例如: /mai search 朋友 或 /mai search lv 13"
+                "请输入搜索关键词，例如: /mai search SUPER AMBULANCE"
             )
             return
 
