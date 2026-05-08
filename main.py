@@ -3,15 +3,13 @@ import pickle  # 用于保存和加载cookies
 import re
 import sqlite3  # 存储绑定信息的数据库
 from pathlib import Path  # 用于处理文件路径
-from jinja2 import Environment, FileSystemLoader  # 用于渲染图片模板
-from playwright.async_api import async_playwright  # 用于生成   图片的无头浏览器自动化库
+
 import aiohttp  # 异步HTTP请求库，用于向maimai net爬取数据
 from bs4 import BeautifulSoup  # 用于解析HTML
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.star import Context, Star, register
-import astrbot.api.message_components as Comp
+from astrbot.api.star import Context, Star
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 from .constant_table_manager import ConstantTableManager
@@ -96,9 +94,9 @@ class MaiPlugin(Star):
             table_selection=self.constant_table_selection
         )
 
-        self.template_path = Path(get_astrbot_data_path()) / "plugins" / self.name / "templates"
-
-        self.env = Environment(loader=FileSystemLoader(self.template_path)) 
+        self.template_path = (
+            Path(get_astrbot_data_path()) / "plugins" / self.name / "templates"
+        )
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
@@ -566,7 +564,9 @@ class MaiPlugin(Star):
         except ValueError:
             return False
 
-    async def _generate_b50_image(self, profile: dict | None, entries: list[dict], qq_id: str) -> str:
+    async def _generate_b50_image(
+        self, profile: dict | None, entries: list[dict], qq_id: str
+    ) -> str:
         if not profile:
             raise ValueError("Profile data is required to generate B50 image")
         # 1. Process and sort entries
@@ -575,13 +575,19 @@ class MaiPlugin(Star):
             rated = self._build_rated_entry(entry)
             if rated:
                 rated_entries.append(rated)
-        
+
         # Sort by rating descending, then achievement descending
         rated_entries.sort(key=lambda x: (x["rating"], x["achievement"]), reverse=True)
 
         current_floor = self._get_current_version_floor(entries)
-        new_top = [e for e in rated_entries if self._is_current_version_entry(e, current_floor)][:15]
-        old_top = [e for e in rated_entries if not self._is_current_version_entry(e, current_floor)][:35]
+        new_top = [
+            e for e in rated_entries if self._is_current_version_entry(e, current_floor)
+        ][:15]
+        old_top = [
+            e
+            for e in rated_entries
+            if not self._is_current_version_entry(e, current_floor)
+        ][:35]
 
         # 2. Data for Template
         render_data = {
@@ -590,57 +596,24 @@ class MaiPlugin(Star):
             "best35": old_top,
             "best15": new_top,
             "total_b50": sum(e["rating"] for e in new_top + old_top),
-            "version_floor": current_floor
+            "version_floor": current_floor,
         }
 
-        # 3. Setup Paths
-        # Ensure the output directory exists
-        output_dir = Path(get_astrbot_data_path()) / "plugin_data" / self.name / "b50_cache"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
-        import datetime
-        unique_id = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S.%f")
-        temp_html_path = self.template_path / f"{qq_id}_{unique_id}.html"
-        output_image_path = output_dir / f"{qq_id}_{unique_id}.png"
+        # 3. Get template string
+        template_path = self.template_path / "b50_template.html"
+        with open(template_path, encoding="utf-8") as f:
+            template_str = f.read()
 
-        # 4. Render HTML
-        template = self.env.get_template("b50_template.html")
-        html_content = template.render(render_data)
+        # 4. Options for rendering
+        options = {
+            "viewport": {"width": 1200, "height": 675},
+            "device_scale_factor": 2,
+            "full_page": False,  # To match the container screenshot
+        }
 
-        try:
-            with open(temp_html_path, "w", encoding="utf-8") as f:
-                f.write(html_content)
-
-            # 5. Playwright Capture
-            async with async_playwright() as p:
-                # Use --no-sandbox for compatibility with Linux/Docker
-                browser = await p.chromium.launch(args=["--no-sandbox"])
-                # 1200x675 matches your CiRCLE background aspect ratio
-                context = await browser.new_context(
-                    viewport={'width': 1200, 'height': 675},
-                    device_scale_factor=2 # Retina quality
-                )
-                page = await context.new_page()
-                
-                # Navigate to the local temp file
-                await page.goto(f"file://{temp_html_path.absolute()}")
-                await page.wait_for_load_state("networkidle")
-                
-                # Target the .container div we defined earlier
-                container = await page.query_selector(".container")
-                if container:
-                    await container.screenshot(path=str(output_image_path))
-                else:
-                    await page.screenshot(path=str(output_image_path), full_page=True)
-                
-                await browser.close()
-            
-            return str(output_image_path)
-
-        finally:
-            # Cleanup temp HTML
-            if temp_html_path.exists():
-                temp_html_path.unlink()
+        # 5. Render
+        url = await self.html_render(template_str, render_data, options=options)
+        return url
 
     @filter.command_group("mai")
     async def mai(self):
@@ -1116,18 +1089,15 @@ MUNET munet MuNET""")
                 yield event.plain_result(f"登录出错: {str(e)}")
                 return
 
-        # code for image generation here, we need playwright here!
+        # code for image generation here
         try:
-            image_path = await self._generate_b50_image(profile, entries, qq_id)
-            chain= [
-                Comp.At(qq=event.get_sender_id()),
-                Comp.Plain(" 你的B50来了喵~"),
-                Comp.Image.fromFileSystem(f"data/plugin_data/{self.name}/b50_image/{event.get_sender_id()}.jpg")
-            ]
-            yield event.chain_result(chain)
+            image_url = await self._generate_b50_image(profile, entries, qq_id)
+            yield event.image_result(image_url)
         except Exception as e:
             logger.error("Failed to generate B50 image: %s", e, exc_info=True)
-            yield event.plain_result(f"绘制失败了喵... 只能给你文字版了：\n{self._render_b50_summary(profile, entries)}")
+            yield event.plain_result(
+                f"绘制失败了喵... 只能给你文字版了：\n{self._render_b50_summary(profile, entries)}"
+            )
 
     @mai.command("search", alias={"搜索"})
     async def mai_search(self, event: AstrMessageEvent, keyword: str = ""):
@@ -1202,7 +1172,9 @@ MUNET munet MuNET""")
     #    pass
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @mai.command("reload-constant-table", alias={"reload-CT", "rct", "刷新定数表", "RCT"})
+    @mai.command(
+        "reload-constant-table", alias={"reload-CT", "rct", "刷新定数表", "RCT"}
+    )
     async def reload_constant_table(self, event: AstrMessageEvent, selection: str = ""):
         """管理员指令，强制刷新定数表数据，可选择表版本 (JP/INT)"""
         # If selection is specified, switch to that table first
