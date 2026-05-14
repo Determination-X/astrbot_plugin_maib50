@@ -10,7 +10,10 @@ from bs4 import BeautifulSoup  # 用于解析HTML
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
-from astrbot.core.utils.astrbot_path import get_astrbot_data_path
+from astrbot.core.utils.astrbot_path import (
+    get_astrbot_plugin_data_path,
+    get_astrbot_plugin_path,
+)
 
 from .constant_table_manager import ConstantTableManager
 
@@ -47,6 +50,9 @@ DIFF_CONSTANT_SUFFIX = {
     4: "remas",
 }
 
+RENDER_WIDTH = 3024
+RENDER_HEIGHT = 1700
+
 
 # Deprecated    @register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "1.0.0")
 class MaiPlugin(Star):
@@ -80,15 +86,15 @@ class MaiPlugin(Star):
             )
             self.constant_table_selection = "INT"
 
-        self.template_background = self.config.get("INT", {}).get("TEMPLATE_BACKGROUND", "")
-
-        self.db_path = (
-            Path(get_astrbot_data_path()) / "plugin_data" / self.name / "bindings.db"
+        self.plugin_data_path = Path(get_astrbot_plugin_data_path()) / self.name
+        self.plugin_path = Path(get_astrbot_plugin_path()) / self.name
+        self.template_background = self._resolve_background_image(
+            self.config.get("INT", {}).get("BACKGROUND_IMAGE", [])
         )
 
-        self.cookies_path = (
-            Path(get_astrbot_data_path()) / "plugin_data" / self.name / "cookies.pkl"
-        )
+        self.db_path = self.plugin_data_path / "bindings.db"
+
+        self.cookies_path = self.plugin_data_path / "cookies.pkl"
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self._ensure_bindings_table()
@@ -96,9 +102,7 @@ class MaiPlugin(Star):
             table_selection=self.constant_table_selection
         )
 
-        self.template_path = (
-            Path(get_astrbot_data_path()) / "plugins" / self.name / "templates"
-        )
+        self.template_path = self.plugin_path / "templates"
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
@@ -170,6 +174,33 @@ class MaiPlugin(Star):
                 pickle.dump(jar._cookies, f)
         except Exception as e:
             logger.warning(f"Failed to save cookies: {e}")
+
+    def _resolve_background_image(self, configured_value: list[str] | str) -> str:
+        if isinstance(configured_value, list):
+            rel_path = next(
+                (
+                    item.strip()
+                    for item in configured_value
+                    if isinstance(item, str) and item.strip()
+                ),
+                "",
+            )
+        elif isinstance(configured_value, str):
+            rel_path = configured_value.strip()
+        else:
+            rel_path = ""
+
+        if not rel_path:
+            return ""
+
+        background_path = (self.plugin_data_path / rel_path).resolve(strict=False)
+        if not background_path.is_file():
+            logger.warning(
+                "Configured background image not found: %s",
+                background_path,
+            )
+            return ""
+        return background_path.as_uri()
 
     def _ensure_bindings_table(self):
         cursor = self.conn.cursor()
@@ -609,11 +640,11 @@ class MaiPlugin(Star):
 
         # 4. Options for rendering
         options = {
-            "viewport": {"width": 1200, "height": 700},
-            "device_scale_factor": 2,
+            "viewport": {"width": RENDER_WIDTH, "height": RENDER_HEIGHT},
+            "device_scale_factor": 1,
             "full_page": False,  # To match the container screenshot
             "scale": "css",
-            "type": "png" 
+            "type": "png",
         }
 
         # 5. Render
