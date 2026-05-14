@@ -1082,8 +1082,6 @@ MUNET munet MuNET""")
                     len(entries),
                     sum(not entry["unplayed"] for entry in entries),
                 )
-                # yield event.plain_result(self._render_b50_summary(profile, entries))
-                # return
 
             except Exception as e:
                 logger.error("/mai b50 failed: %s", e, exc_info=True)
