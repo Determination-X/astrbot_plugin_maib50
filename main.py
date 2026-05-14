@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup  # 用于解析HTML
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
+import astrbot.api.message_components as Comp
 from astrbot.core.utils.astrbot_path import (
     get_astrbot_plugin_data_path,
     get_astrbot_plugin_path,
@@ -1128,7 +1129,11 @@ MUNET munet MuNET""")
         # code for image generation here
         try:
             image_url = await self._generate_b50_image(profile, entries, qq_id)
-            yield event.image_result(image_url)
+            chain = [
+                Comp.Plain("这是你的B50数据喵~"),
+                Comp.Image.fromURL(image_url)
+            ]
+            yield event.chain_result(chain)
         except Exception as e:
             logger.error("Failed to generate B50 image: %s", e, exc_info=True)
             yield event.plain_result(
