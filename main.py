@@ -50,8 +50,9 @@ DIFF_CONSTANT_SUFFIX = {
     4: "remas",
 }
 
-RENDER_WIDTH = 3024
-RENDER_HEIGHT = 1700
+LAYOUT_WIDTH = 1200
+LAYOUT_HEIGHT = 700
+RENDER_SCALE = 1700 / 700
 
 
 # Deprecated    @register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "1.0.0")
@@ -88,10 +89,6 @@ class MaiPlugin(Star):
 
         self.plugin_data_path = Path(get_astrbot_plugin_data_path()) / self.name
         self.plugin_path = Path(get_astrbot_plugin_path()) / self.name
-        self.template_background = self._resolve_background_image(
-            self.config.get("INT", {}).get("BACKGROUND_IMAGE", [])
-        )
-
         self.db_path = self.plugin_data_path / "bindings.db"
 
         self.cookies_path = self.plugin_data_path / "cookies.pkl"
@@ -201,6 +198,11 @@ class MaiPlugin(Star):
             )
             return ""
         return background_path.as_uri()
+
+    def _get_template_background(self) -> str:
+        return self._resolve_background_image(
+            self.config.get("INT", {}).get("BACKGROUND_IMAGE", [])
+        )
 
     def _ensure_bindings_table(self):
         cursor = self.conn.cursor()
@@ -630,7 +632,7 @@ class MaiPlugin(Star):
             "best15": new_top,
             "total_b50": sum(e["rating"] for e in new_top + old_top),
             "version_floor": current_floor,
-            "background_image": self.template_background,
+            "background_image": self._get_template_background(),
         }
 
         # 3. Get template string
@@ -640,8 +642,8 @@ class MaiPlugin(Star):
 
         # 4. Options for rendering
         options = {
-            "viewport": {"width": RENDER_WIDTH, "height": RENDER_HEIGHT},
-            "device_scale_factor": 1,
+            "viewport": {"width": LAYOUT_WIDTH, "height": LAYOUT_HEIGHT},
+            "device_scale_factor": RENDER_SCALE,
             "full_page": False,  # To match the container screenshot
             "scale": "css",
             "type": "png",
