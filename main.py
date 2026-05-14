@@ -2,15 +2,17 @@ import os
 import pickle  # 用于保存和加载cookies
 import re
 import sqlite3  # 存储绑定信息的数据库
+from base64 import b64encode
+from mimetypes import guess_type
 from pathlib import Path  # 用于处理文件路径
 
 import aiohttp  # 异步HTTP请求库，用于向maimai net爬取数据
 from bs4 import BeautifulSoup  # 用于解析HTML
 
+import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
-import astrbot.api.message_components as Comp
 from astrbot.core.utils.astrbot_path import (
     get_astrbot_plugin_data_path,
     get_astrbot_plugin_path,
@@ -53,7 +55,8 @@ DIFF_CONSTANT_SUFFIX = {
 
 LAYOUT_WIDTH = 1200
 LAYOUT_HEIGHT = 700
-RENDER_SCALE = 1700 / 700
+RENDER_WIDTH = 3024
+RENDER_HEIGHT = 1700
 
 
 # Deprecated    @register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "1.0.0")
@@ -198,7 +201,17 @@ class MaiPlugin(Star):
                 background_path,
             )
             return ""
-        return background_path.as_uri()
+        try:
+            mime_type = (
+                guess_type(background_path.name)[0] or "application/octet-stream"
+            )
+            encoded = b64encode(background_path.read_bytes()).decode("ascii")
+        except OSError as exc:
+            logger.warning(
+                "Failed to read background image %s: %s", background_path, exc
+            )
+            return ""
+        return f"data:{mime_type};base64,{encoded}"
 
     def _get_template_background(self) -> str:
         return self._resolve_background_image(
@@ -643,10 +656,7 @@ class MaiPlugin(Star):
 
         # 4. Options for rendering
         options = {
-            "viewport": {"width": LAYOUT_WIDTH, "height": LAYOUT_HEIGHT},
-            "device_scale_factor": RENDER_SCALE,
-            "full_page": False,  # To match the container screenshot
-            "scale": "css",
+            "full_page": True,
             "type": "png",
         }
 
@@ -1129,10 +1139,7 @@ MUNET munet MuNET""")
         # code for image generation here
         try:
             image_url = await self._generate_b50_image(profile, entries, qq_id)
-            chain = [
-                Comp.Plain("这是你的B50数据喵~"),
-                Comp.Image.fromURL(image_url)
-            ]
+            chain = [Comp.Plain("这是你的B50数据喵~"), Comp.Image.fromURL(image_url)]
             yield event.chain_result(chain)
         except Exception as e:
             logger.error("Failed to generate B50 image: %s", e, exc_info=True)
