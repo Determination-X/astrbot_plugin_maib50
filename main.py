@@ -80,6 +80,12 @@ class MaiPlugin(Star):
             )
             self.constant_table_selection = "INT"
 
+        self.template_background = self.config.get(
+            "INT", {}
+        ).get(
+            "BACKGROUND_IMAGE", ""
+        )
+
         self.db_path = (
             Path(get_astrbot_data_path()) / "plugin_data" / self.name / "bindings.db"
         )
