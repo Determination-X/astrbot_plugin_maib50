@@ -609,7 +609,7 @@ class MaiPlugin(Star):
             "viewport": {"width": 1200, "height": 675},
             "device_scale_factor": 2,
             "full_page": False,  # To match the container screenshot
-            "type": "png"
+            "scale": "css"
         }
 
         # 5. Render
