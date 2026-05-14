@@ -80,6 +80,8 @@ class MaiPlugin(Star):
             )
             self.constant_table_selection = "INT"
 
+        self.template_background = self.config.get("INT", {}).get("TEMPLATE_BACKGROUND", "")
+
         self.db_path = (
             Path(get_astrbot_data_path()) / "plugin_data" / self.name / "bindings.db"
         )
@@ -597,6 +599,7 @@ class MaiPlugin(Star):
             "best15": new_top,
             "total_b50": sum(e["rating"] for e in new_top + old_top),
             "version_floor": current_floor,
+            "background_image": self.template_background,
         }
 
         # 3. Get template string
@@ -609,7 +612,8 @@ class MaiPlugin(Star):
             "viewport": {"width": 2400, "height": 1400},
             "device_scale_factor": 2,
             "full_page": False,  # To match the container screenshot
-            "scale": "css"
+            "scale": "css",
+            "type": "png" 
         }
 
         # 5. Render
