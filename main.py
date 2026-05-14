@@ -176,6 +176,16 @@ class MaiPlugin(Star):
         except Exception as e:
             logger.warning(f"Failed to save cookies: {e}")
 
+    def _file_to_data_uri(self, file_path: Path) -> str:
+        try:
+            mime_type = guess_type(file_path.name)[0] or "application/octet-stream"
+            encoded = b64encode(file_path.read_bytes()).decode("ascii")
+        except OSError as exc:
+            logger.warning("Failed to read image file %s: %s", file_path, exc)
+            return ""
+
+        return f"data:{mime_type};base64,{encoded}"
+
     def _resolve_background_image(self, configured_value: list[str] | str) -> str:
         if isinstance(configured_value, list):
             rel_path = next(
@@ -201,22 +211,32 @@ class MaiPlugin(Star):
                 background_path,
             )
             return ""
-        try:
-            mime_type = (
-                guess_type(background_path.name)[0] or "application/octet-stream"
-            )
-            encoded = b64encode(background_path.read_bytes()).decode("ascii")
-        except OSError as exc:
-            logger.warning(
-                "Failed to read background image %s: %s", background_path, exc
-            )
-            return ""
-        return f"data:{mime_type};base64,{encoded}"
+        return self._file_to_data_uri(background_path)
 
     def _get_template_background(self) -> str:
         return self._resolve_background_image(
             self.config.get("INT", {}).get("BACKGROUND_IMAGE", [])
         )
+
+    def _resolve_song_cover(self, entry: dict) -> str:
+        constant_table = entry.get("constant_table") or {}
+        cover_name = str(constant_table.get("image_url", "")).strip()
+        if not cover_name:
+            return ""
+
+        cover_path = (self.plugin_path / "static" / "img" / cover_name).resolve(
+            strict=False
+        )
+        if not cover_path.is_file():
+            logger.debug(
+                "Song cover not found for title=%r image_url=%r path=%s",
+                entry.get("title"),
+                cover_name,
+                cover_path,
+            )
+            return ""
+
+        return self._file_to_data_uri(cover_path)
 
     def _ensure_bindings_table(self):
         cursor = self.conn.cursor()
@@ -573,6 +593,7 @@ class MaiPlugin(Star):
             "rank_factor": rank_factor,
             "rating": rating,
             "version": str((entry.get("constant_table") or {}).get("version", "")),
+            "img": self._resolve_song_cover(entry),
         }
 
     def _detect_current_version_floor(self, entries: list[dict]) -> int | None:
