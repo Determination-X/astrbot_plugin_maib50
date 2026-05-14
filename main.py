@@ -603,6 +603,7 @@ class MaiPlugin(Star):
             "best15": new_top,
             "total_b50": sum(e["rating"] for e in new_top + old_top),
             "version_floor": current_floor,
+            "background_image": self.template_background,
         }
 
         # 3. Get template string
