@@ -27,6 +27,7 @@
                 "type": "file",
                 "default": [],
                 "file_type": ["jpg", "jpeg", "png", "bmp"]
+            }
         }
     }
 }
