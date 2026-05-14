@@ -606,8 +606,8 @@ class MaiPlugin(Star):
 
         # 4. Options for rendering
         options = {
-            "viewport": {"width": 1200, "height": 700},
-            "device_scale_factor": 4,
+            "viewport": {"width": 2400, "height": 1400},
+            "device_scale_factor": 2,
             "full_page": False,  # To match the container screenshot
             "scale": "css"
         }
