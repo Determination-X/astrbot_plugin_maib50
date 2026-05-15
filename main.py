@@ -53,6 +53,14 @@ DIFF_CONSTANT_SUFFIX = {
     4: "remas",
 }
 
+DIFF_CLASS_NAMES = {
+    0: "BASIC",
+    1: "ADVANCED",
+    2: "EXPERT",
+    3: "MASTER",
+    4: "RE-MASTER",
+}
+
 LAYOUT_WIDTH = 1200
 LAYOUT_HEIGHT = 700
 RENDER_WIDTH = 3024
@@ -418,6 +426,9 @@ class MaiPlugin(Star):
                     "level": self._normalize_whitespace(level_node.get_text()),
                     "type": chart_type,
                     "difficulty": DIFF_LABELS.get(diff_index, str(diff_index)),
+                    "difficulty_class": DIFF_CLASS_NAMES.get(
+                        diff_index, str(diff_index)
+                    ),
                     "difficulty_index": diff_index,
                     "achievement": achievement,
                     "achievement_text": f"{achievement:.4f}%",
