@@ -218,25 +218,25 @@ class MaiPlugin(Star):
             self.config.get("INT", {}).get("BACKGROUND_IMAGE", [])
         )
 
-    def _resolve_song_cover(self, entry: dict) -> str:
+    def _resolve_song_jacket(self, entry: dict) -> str:
         constant_table = entry.get("constant_table") or {}
-        cover_name = str(constant_table.get("image_url", "")).strip()
-        if not cover_name:
+        jacket_name = str(constant_table.get("image_url", "")).strip()
+        if not jacket_name:
             return ""
 
-        cover_path = (self.plugin_path / "static" / "img" / cover_name).resolve(
-            strict=False
-        )
-        if not cover_path.is_file():
+        jacket_path = (
+            self.plugin_data_path / "static" / "jacket" / jacket_name
+        ).resolve(strict=False)
+        if not jacket_path.is_file():
             logger.debug(
-                "Song cover not found for title=%r image_url=%r path=%s",
+                "Song jacket not found for title=%r image_url=%r path=%s",
                 entry.get("title"),
-                cover_name,
-                cover_path,
+                jacket_name,
+                jacket_path,
             )
             return ""
 
-        return self._file_to_data_uri(cover_path)
+        return self._file_to_data_uri(jacket_path)
 
     def _ensure_bindings_table(self):
         cursor = self.conn.cursor()
@@ -593,7 +593,7 @@ class MaiPlugin(Star):
             "rank_factor": rank_factor,
             "rating": rating,
             "version": str((entry.get("constant_table") or {}).get("version", "")),
-            "img": self._resolve_song_cover(entry),
+            "img": self._resolve_song_jacket(entry),
         }
 
     def _detect_current_version_floor(self, entries: list[dict]) -> int | None:
