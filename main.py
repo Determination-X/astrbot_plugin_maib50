@@ -254,31 +254,50 @@ class MaiPlugin(Star):
         if cursor.fetchone():
             cursor.execute("PRAGMA table_info(bindings)")
             columns = [row[1] for row in cursor.fetchall()]
-            if columns == ["qq_id", "friend_code", "server"]:
+            if "platform_name" not in columns:
                 cursor.execute("ALTER TABLE bindings RENAME TO bindings_old")
                 cursor.execute(
                     """CREATE TABLE bindings (
-                    qq_id TEXT,
+                    uid TEXT,
+                    platform_name TEXT DEFAULT '',
                     friend_code TEXT,
                     server TEXT,
-                    PRIMARY KEY (qq_id, server)
+                    PRIMARY KEY (uid, platform_name, server)
                 )"""
                 )
                 cursor.execute(
-                    "INSERT OR REPLACE INTO bindings (qq_id, friend_code, server) SELECT qq_id, friend_code, server FROM bindings_old"
+                    "INSERT OR REPLACE INTO bindings (uid, platform_name, friend_code, server) SELECT uid, '', friend_code, server FROM bindings_old"
                 )
                 cursor.execute("DROP TABLE bindings_old")
                 self.conn.commit()
                 return
         cursor.execute(
             """CREATE TABLE IF NOT EXISTS bindings (
-            qq_id TEXT,
+            uid TEXT,
+            platform_name TEXT DEFAULT '',
             friend_code TEXT,
             server TEXT,
-            PRIMARY KEY (qq_id, server)
+            PRIMARY KEY (uid, platform_name, server)
         )"""
         )
         self.conn.commit()
+
+    def _get_binding(
+        self, uid: str, platform_name: str, server: str
+    ) -> tuple[str, str] | None:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """SELECT platform_name, friend_code
+            FROM bindings
+            WHERE uid = ? AND server = ? AND platform_name IN (?, '')
+            ORDER BY CASE WHEN platform_name = ? THEN 0 ELSE 1 END
+            LIMIT 1""",
+            (uid, server, platform_name, platform_name),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return row[0], row[1]
 
     def _normalize_server(self, server: str) -> str | None:
         normalized = server.strip()
@@ -647,7 +666,7 @@ class MaiPlugin(Star):
             return False
 
     async def _generate_b50_image(
-        self, profile: dict | None, entries: list[dict], qq_id: str
+        self, profile: dict | None, entries: list[dict], uid: str
     ) -> str:
         if not profile:
             raise ValueError("Profile data is required to generate B50 image")
@@ -767,21 +786,26 @@ MUNET munet MuNET""")
                 f"{server} 的绑定功能正在开发喵~为什么不去找开发者催更呢w？"
             )
             return
-        qq_id = event.get_sender_id()
-        cursor = self.conn.cursor()
-        cursor.execute(
-            "SELECT friend_code FROM bindings WHERE qq_id = ? AND server = ?",
-            (qq_id, normalized_server),
-        )
-        row = cursor.fetchone()
+        platform_name = event.get_platform_name()
+        uid = event.get_sender_id()
+        row = self._get_binding(uid, platform_name, normalized_server)
         if row:
-            old_code = row[0]
+            bound_platform_name, old_code = row
             if old_code == friend_code:
                 yield event.plain_result(f"你已经绑定了当前国际服好友码：{friend_code}")
                 return
             self.conn.execute(
-                "INSERT OR REPLACE INTO bindings (qq_id, friend_code, server) VALUES (?, ?, ?)",
-                (qq_id, friend_code, normalized_server),
+                "DELETE FROM bindings WHERE uid = ? AND server = ? AND platform_name IN (?, '')",
+                (uid, normalized_server, platform_name),
+            )
+            self.conn.execute(
+                "INSERT OR REPLACE INTO bindings (uid, platform_name, friend_code, server) VALUES (?, ?, ?, ?)",
+                (
+                    uid,
+                    platform_name or bound_platform_name,
+                    friend_code,
+                    normalized_server,
+                ),
             )
             self.conn.commit()
             yield event.plain_result(
@@ -789,8 +813,8 @@ MUNET munet MuNET""")
             )
             return
         self.conn.execute(
-            "INSERT OR REPLACE INTO bindings (qq_id, friend_code, server) VALUES (?, ?, ?)",
-            (qq_id, friend_code, normalized_server),
+            "INSERT OR REPLACE INTO bindings (uid, platform_name, friend_code, server) VALUES (?, ?, ?, ?)",
+            (uid, platform_name, friend_code, normalized_server),
         )
         self.conn.commit()
         yield event.plain_result(f"成功绑定国际服好友码：{friend_code}")
@@ -805,21 +829,24 @@ MUNET munet MuNET""")
             )
             return
         cursor = self.conn.cursor()
-        cursor.execute("SELECT qq_id, friend_code, server FROM bindings")
+        cursor.execute("SELECT uid, platform_name, friend_code, server FROM bindings")
         rows = cursor.fetchall()
         if not rows:
             yield event.plain_result("没有任何绑定信息")
             return
         result = "所有绑定信息:\n"
-        for qq_id, friend_code, server in rows:
-            result += f"QQ ID: {qq_id}, 服务器: {server}, 好友码: {friend_code}\n"
+        for uid, platform_name, friend_code, server in rows:
+            result += (
+                f"UID: {uid}, 平台: {platform_name or '<legacy>'}, "
+                f"服务器: {server}, 好友码: {friend_code}\n"
+            )
         yield event.plain_result(result)
 
     @mai.command("unbind", alias={"解绑"})
     async def mai_unbind(self, event: AstrMessageEvent, server: str = ""):
         """解绑好友码"""
-        qq_id = event.get_sender_id()
-        cursor = self.conn.cursor()
+        platform_name = event.get_platform_name()
+        uid = event.get_sender_id()
         if server:
             normalized_server = self._normalize_server(server)
             if not normalized_server:
@@ -827,31 +854,32 @@ MUNET munet MuNET""")
                     "服务器输错了喵，请使用 INT、CN、RIN、JP 或 MUNET 作为服务器参数"
                 )
                 return
-            cursor.execute(
-                "SELECT friend_code FROM bindings WHERE qq_id = ? AND server = ?",
-                (qq_id, normalized_server),
-            )
-            row = cursor.fetchone()
+            row = self._get_binding(uid, platform_name, normalized_server)
             if not row:
                 yield event.plain_result(f"你还没有绑定{normalized_server}的好友码")
                 return
             self.conn.execute(
-                "DELETE FROM bindings WHERE qq_id = ? AND server = ?",
-                (qq_id, normalized_server),
+                "DELETE FROM bindings WHERE uid = ? AND server = ? AND platform_name IN (?, '')",
+                (uid, normalized_server, platform_name),
             )
             self.conn.commit()
             yield event.plain_result(
                 f"已解绑{normalized_server}好友码，maimai DX NET上的好友关系需要你手动删除喵~(或者考虑找开发者催更一个自动删除好友的功能(挖坑+1...)"
             )
             return
+        cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT friend_code, server FROM bindings WHERE qq_id = ?", (qq_id,)
+            "SELECT friend_code, server FROM bindings WHERE uid = ? AND platform_name IN (?, '')",
+            (uid, platform_name),
         )
         row = cursor.fetchone()
         if not row:
             yield event.plain_result("你还没有绑定任何好友码")
             return
-        self.conn.execute("DELETE FROM bindings WHERE qq_id = ?", (qq_id,))
+        self.conn.execute(
+            "DELETE FROM bindings WHERE uid = ? AND platform_name IN (?, '')",
+            (uid, platform_name),
+        )
         self.conn.commit()
         yield event.plain_result(
             "解绑成功，maimai DX NET上的好友关系需要你手动删除喵~(或者考虑找开发者催更一个自动删除好友的功能w)"
@@ -883,19 +911,16 @@ MUNET munet MuNET""")
         #    )
         #    return
 
-        qq_id = event.get_sender_id()
-        cursor = self.conn.cursor()
-        cursor.execute(
-            "SELECT friend_code, server FROM bindings WHERE qq_id = ? AND server = ?",
-            (qq_id, "INT"),
-        )
-        row = cursor.fetchone()
+        platform_name = event.get_platform_name()
+        uid = event.get_sender_id()
+        row = self._get_binding(uid, platform_name, "INT")
         if not row:
             yield event.plain_result(
                 "未绑定国际服好友码，请先使用 /mai bind INT <好友码> 绑定"
             )
             return
-        friend_code, server = row
+        _, friend_code = row
+        server = "INT"
 
         yield event.plain_result("正在查询数据，请稍候喵~")
         # Login using aiohttp
@@ -1171,7 +1196,7 @@ MUNET munet MuNET""")
 
         # code for image generation here
         try:
-            image_url = await self._generate_b50_image(profile, entries, qq_id)
+            image_url = await self._generate_b50_image(profile, entries, uid)
             chain = [Comp.Plain("这是你的B50数据喵~"), Comp.Image.fromURL(image_url)]
             yield event.chain_result(chain)
         except Exception as e:
