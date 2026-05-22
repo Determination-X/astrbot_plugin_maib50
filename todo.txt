@@ -1,7 +1,0 @@
-bot login [DONE]
-bind friend code to qqid [DONE]
-check friend status [DONE]
-add friend [DONE]
-remove friend [TODO]
-fetch data from friend [TODO]
-pending refactor of local path parsing with astr api[TODO]
