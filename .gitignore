@@ -208,3 +208,6 @@ __marimo__/
 
 # Packet analyzer logs
 *.har
+
+# personal todos
+todo.txt
