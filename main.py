@@ -67,7 +67,7 @@ RENDER_WIDTH = 3024
 RENDER_HEIGHT = 1700
 
 
-# Deprecated    @register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "1.0.0")
+# Deprecated    @register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "1.0.1")
 class MaiPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
