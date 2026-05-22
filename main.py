@@ -601,6 +601,7 @@ class MaiPlugin(Star):
         return {
             **entry,
             "chart_constant": chart_constant,
+            "constant_display": f"{chart_constant:.1f} → {rating}",
             "rank_factor": rank_factor,
             "rating": rating,
             "version": str((entry.get("constant_table") or {}).get("version", "")),

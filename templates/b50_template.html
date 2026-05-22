@@ -159,7 +159,12 @@
             font-size: 8px;
             color: #ddd;
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-start;
+        }
+
+        .constant-rating {
+            font-size: 8px;
+            color: #eee;
         }
 
         /* Difficulty Tags */
@@ -203,7 +208,7 @@
                     <div class="title">{{ song.title }}</div>
                     <div class="achievement">{{ song.achievement_text }}</div>
                     <div class="meta">
-                        <span>{{ song.rating }}</span>
+                        <span class="constant-rating">{{ song.constant_display }}</span>
                     </div>
                 </div>
                 <div class="diff-tag {{ song.difficulty_class }}"></div>
@@ -222,7 +227,7 @@
                     <div class="title">{{ song.title }}</div>
                     <div class="achievement">{{ song.achievement_text }}</div>
                     <div class="meta">
-                        <span>{{ song.rating }}</span>
+                        <span class="constant-rating">{{ song.constant_display }}</span>
                     </div>
                 </div>
                 <div class="diff-tag {{ song.difficulty_class }}"></div>
