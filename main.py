@@ -764,21 +764,21 @@ MUNET munet MuNET""")
             "jpn",
         ]:
             yield event.plain_result(
-                "服务器输错了喵，请使用 INT、CN、RIN 或 MUNET 作为服务器参数"
+                "服务器输错了，请使用 INT、CN、RIN 或 MUNET 作为服务器参数"
             )
             return
         if len(event.message_str.split()) < 3:
             yield event.plain_result(
-                "参数错误！请使用 /mai bind <服务器> <好友码> 的格式进行绑定喵"
+                "参数错误！请使用 /mai bind <服务器> <好友码> 的格式进行绑定"
             )
             return
         if not friend_code.isdigit():
-            yield event.plain_result("好友码输错了喵，好友码应该是纯数字")
+            yield event.plain_result("好友码输错了，好友码应该是纯数字")
             return
         normalized_server = self._normalize_server(server)
         if not normalized_server:
             yield event.plain_result(
-                "服务器输错了喵，请使用 INT、CN、RIN、JP 或 MUNET 作为服务器参数"
+                "服务器输错了，请使用 INT、CN、RIN、JP 或 MUNET 作为服务器参数"
             )
             return
         if normalized_server != "INT":
@@ -825,7 +825,7 @@ MUNET munet MuNET""")
         """管理员指令，查看所有绑定信息"""
         if event.get_group_id() != "" and force not in ["--force", "-f"]:
             yield event.plain_result(
-                "该指令涉及玩家好友码隐私，只能在私聊中使用喵！如要強制在群里使用，请添加--force或-f参数"
+                "该指令涉及玩家好友码隐私，只能在私聊中使用！如要強制在群里使用，请添加--force或-f参数"
             )
             return
         cursor = self.conn.cursor()
@@ -851,7 +851,7 @@ MUNET munet MuNET""")
             normalized_server = self._normalize_server(server)
             if not normalized_server:
                 yield event.plain_result(
-                    "服务器输错了喵，请使用 INT、CN、RIN、JP 或 MUNET 作为服务器参数"
+                    "服务器输错了，请使用 INT、CN、RIN、JP 或 MUNET 作为服务器参数"
                 )
                 return
             row = self._get_binding(uid, platform_name, normalized_server)
@@ -864,7 +864,7 @@ MUNET munet MuNET""")
             )
             self.conn.commit()
             yield event.plain_result(
-                f"已解绑{normalized_server}好友码，maimai DX NET上的好友关系需要你手动删除喵~(或者考虑找开发者催更一个自动删除好友的功能(挖坑+1...)"
+                f"已解绑{normalized_server}好友码，maimai DX NET上的好友关系需要你手动删除~(或者考虑找开发者催更一个自动删除好友的功能(挖坑+1...)"
             )
             return
         cursor = self.conn.cursor()
@@ -882,7 +882,7 @@ MUNET munet MuNET""")
         )
         self.conn.commit()
         yield event.plain_result(
-            "解绑成功，maimai DX NET上的好友关系需要你手动删除喵~(或者考虑找开发者催更一个自动删除好友的功能w)"
+            "解绑成功，maimai DX NET上的好友关系需要你手动删除~(或者考虑找开发者催更一个自动删除好友的功能w)"
         )
 
     @mai.command("b50")
@@ -893,12 +893,12 @@ MUNET munet MuNET""")
         bot_password = self.password
         if bot_sid == "":
             yield event.plain_result(
-                "插件未配置BOT_SID，无法查询数据，请联系管理员配置好BOT_SID后再试喵"
+                "插件未配置BOT_SID，无法查询数据，请联系管理员配置好BOT_SID后再试"
             )
             return
         if bot_password == "":
             yield event.plain_result(
-                "插件未配置BOT_PASSWORD，无法查询数据，请联系管理员配置好BOT_PASSWORD后再试喵"
+                "插件未配置BOT_PASSWORD，无法查询数据，请联系管理员配置好BOT_PASSWORD后再试"
             )
             return
 
@@ -907,7 +907,7 @@ MUNET munet MuNET""")
 
         # if now_gmt9.weekday() == 1 and 2 <= now_gmt9.hour < 6:
         #    yield event.plain_result(
-        #        "现在是每周二的维护时间(02:00-06:00 UTC+9),暂时无法查询数据,请在维护结束后再试喵"
+        #        "现在是每周二的维护时间(02:00-06:00 UTC+9),暂时无法查询数据,请在维护结束后再试"
         #    )
         #    return
 
@@ -922,7 +922,7 @@ MUNET munet MuNET""")
         _, friend_code = row
         server = "INT"
 
-        yield event.plain_result("正在查询数据，请稍候喵~")
+        yield event.plain_result("正在查询数据，请稍候~")
         # Login using aiohttp
         login_url = "https://lng-tgk-aime-gw.am-all.net/common_auth/login/sid"
         login_data = {"retention": "1", "sid": bot_sid, "password": bot_password}
@@ -1197,12 +1197,12 @@ MUNET munet MuNET""")
         # code for image generation here
         try:
             image_url = await self._generate_b50_image(profile, entries, uid)
-            chain = [Comp.Plain("这是你的B50数据喵~"), Comp.Image.fromURL(image_url)]
+            chain = [Comp.Plain("这是你的B50数据~"), Comp.Image.fromURL(image_url)]
             yield event.chain_result(chain)
         except Exception as e:
             logger.error("Failed to generate B50 image: %s", e, exc_info=True)
             yield event.plain_result(
-                f"绘制失败了喵... 只能给你文字版了：\n{self._render_b50_summary(profile, entries)}"
+                f"绘制失败了... 只能给你文字版了：\n{self._render_b50_summary(profile, entries)}"
             )
 
     @mai.command("search", alias={"搜索"})
@@ -1232,7 +1232,7 @@ MUNET munet MuNET""")
                         matching_entries.append(entry)
 
                 if not matching_entries:
-                    yield event.plain_result(f"未找到匹配 '{keyword}' 的歌曲喵~")
+                    yield event.plain_result(f"未找到匹配 '{keyword}' 的歌曲~")
                     return
 
                 # Sort by title
