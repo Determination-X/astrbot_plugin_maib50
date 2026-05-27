@@ -836,9 +836,13 @@ MUNET munet MuNET""")
             image_url = await self.b50_helper.generate_image(
                 self, profile, entries, uid
             )
-            if event.get_platform_name() == "discord":  # 在Discord上，依靠yield进行被动发送图片会导致图片发送失败，正在对self.context.send_message(即主动发送)进行测试
+            if (
+                event.get_platform_name() == "discord"
+            ):  # 在Discord上，依靠yield进行被动发送图片会导致图片发送失败，正在对self.context.send_message(即主动发送)进行测试
                 umo = event.unified_msg_object
-                message_chain = MessageChain().message("这是你的B50数据~").image(image_url)
+                message_chain = (
+                    MessageChain().message("这是你的B50数据~").image(image_url)
+                )
                 await self.context.send_message(umo, message_chain)
             else:
                 chain = [Comp.Plain("这是你的B50数据~"), Comp.Image.fromURL(image_url)]
@@ -892,9 +896,11 @@ MUNET munet MuNET""")
             image_url = await self.ap50_helper.generate_image(
                 self, profile, entries, uid
             )
-            if event.get_platform_name() == "discord": 
-                umo = event.unified_msg_object # 在Discord上，依靠yield进行被动发送图片会导致图片发送失败，正在对self.context.send_message(即主动发送)进行测试
-                message_chain = MessageChain().message("这是你的AP50数据~").image(image_url)
+            if event.get_platform_name() == "discord":
+                umo = event.unified_msg_object  # 在Discord上，依靠yield进行被动发送图片会导致图片发送失败，正在对self.context.send_message(即主动发送)进行测试
+                message_chain = (
+                    MessageChain().message("这是你的AP50数据~").image(image_url)
+                )
                 await self.context.send_message(umo, message_chain)
             else:
                 chain = [Comp.Plain("这是你的AP50数据~"), Comp.Image.fromURL(image_url)]
