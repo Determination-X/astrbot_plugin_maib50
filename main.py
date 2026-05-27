@@ -28,6 +28,7 @@ from .lookup import MaimaiLookupHelper
 help_text = """/mai可用指令:
 ├──/mai b50
 ├──/mai ap50
+├──/mai view-all-binds [--force|-f]
 ├──/mai bind <服务器> <好友码>
 │   ├── INT
 │   │   CN (开发中)
@@ -37,6 +38,7 @@ help_text = """/mai可用指令:
 ├──/mai unbind [服务器]
 ├──/mai help
 └──/mai search <关键词>
+[可选参数] <必选参数>
 
 可用服务器:  国际服
 开发中:  国服 Rin服 MuNET
