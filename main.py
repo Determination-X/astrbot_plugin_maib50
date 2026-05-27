@@ -19,6 +19,7 @@ from astrbot.core.utils.astrbot_path import (
 )
 
 from .ap50 import AP50Helper
+from .b50 import B50Helper
 from .constant_table_manager import ConstantTableManager
 from .lookup import MaimaiLookupHelper
 
@@ -115,6 +116,7 @@ class MaiPlugin(Star):
         )
 
         self.template_path = self.plugin_path / "templates"
+        self.b50_helper = B50Helper(self.template_path)
         self.ap50_helper = AP50Helper(self.template_path)
         self.lookup_helper = MaimaiLookupHelper()
 
@@ -502,66 +504,6 @@ class MaiPlugin(Star):
             entries.extend(self._parse_friend_entries_from_html(html, diff_index))
         return profile or {"name": "Unknown", "rating": "Unknown"}, entries
 
-    def _render_b50_summary(self, profile: dict | None, entries: list[dict]) -> str:
-        if profile is None:
-            return "Failed to retrieve friend profile information."
-        rated_entries = [
-            rated_entry
-            for entry in entries
-            for rated_entry in [self._build_rated_entry(entry)]
-            if rated_entry is not None
-        ]
-        rated_entries.sort(
-            key=lambda entry: (entry["rating"], entry["achievement"]), reverse=True
-        )
-        current_version_floor = self._get_current_version_floor(entries)
-        new_entries = [
-            entry
-            for entry in rated_entries
-            if self._is_current_version_entry(entry, current_version_floor)
-        ]
-        old_entries = [
-            entry
-            for entry in rated_entries
-            if not self._is_current_version_entry(entry, current_version_floor)
-        ]
-        new_top = new_entries[:15]
-        old_top = old_entries[:35]
-        total_rating = sum(entry["rating"] for entry in new_top + old_top)
-        played_entries = [entry for entry in entries if not entry["unplayed"]]
-        unplayed_count = len(entries) - len(played_entries)
-
-        lines = [
-            f"{profile['name']} (Rating: {profile['rating']})",
-            f"Played charts: {len(played_entries)} / {len(entries)}",
-            f"Unplayed charts excluded: {unplayed_count}",
-            f"Current-version floor: {current_version_floor if current_version_floor is not None else 'Unknown'}",
-            f"B50 total rating: {total_rating} (New {len(new_top)}/15 + Old {len(old_top)}/35)",
-            "\n=== New15 ===",
-        ]
-        if new_top:
-            for index, entry in enumerate(new_top, start=1):
-                lines.append(
-                    f"{index:02d}. [{entry['difficulty']}] {entry['title']} | {entry['type']} {entry['level']} | {entry['achievement_text']} | c{entry['chart_constant']:.1f} x {entry['rank_factor']:.1f} => {entry['rating']}"
-                )
-        else:
-            lines.append("No current-version charts found in New15 selection.")
-
-        lines.append("\n\n=== Old35 ===\n")
-        if old_top:
-            for index, entry in enumerate(old_top, start=1):
-                lines.append(
-                    f"{index:02d}. [{entry['difficulty']}] {entry['title']} | {entry['type']} {entry['level']} | {entry['achievement_text']} | c{entry['chart_constant']:.1f} x {entry['rank_factor']:.1f} => {entry['rating']}"
-                )
-        else:
-            lines.append("No old-version charts found in Old35 selection.")
-
-        if not new_top and not old_top:
-            lines.append(
-                "No rated charts found for this friend (missing constants or low achievements)."
-            )
-        return "\n".join(lines)
-
     def _get_rank_factor(self, achievement: float) -> float:
         if achievement >= 100.5:
             return 22.4
@@ -669,57 +611,6 @@ class MaiPlugin(Star):
             return int(entry.get("version", "0")) >= current_version_floor
         except ValueError:
             return False
-
-    async def _generate_b50_image(
-        self, profile: dict | None, entries: list[dict], uid: str
-    ) -> str:
-        if not profile:
-            raise ValueError("Profile data is required to generate B50 image")
-        # 1. Process and sort entries
-        rated_entries = []
-        for entry in entries:
-            rated = self._build_rated_entry(entry)
-            if rated:
-                rated_entries.append(rated)
-
-        # Sort by rating descending, then achievement descending
-        rated_entries.sort(key=lambda x: (x["rating"], x["achievement"]), reverse=True)
-
-        current_floor = self._get_current_version_floor(entries)
-        new_top = [
-            e for e in rated_entries if self._is_current_version_entry(e, current_floor)
-        ][:15]
-        old_top = [
-            e
-            for e in rated_entries
-            if not self._is_current_version_entry(e, current_floor)
-        ][:35]
-
-        # 2. Data for Template
-        render_data = {
-            "player_name": profile["name"],
-            "player_rating": profile["rating"],
-            "best35": old_top,
-            "best15": new_top,
-            "total_b50": sum(e["rating"] for e in new_top + old_top),
-            "version_floor": current_floor,
-            "background_image": self._get_template_background(),
-        }
-
-        # 3. Get template string
-        template_path = self.template_path / "b50_template.html"
-        with open(template_path, encoding="utf-8") as f:
-            template_str = f.read()
-
-        # 4. Options for rendering
-        options = {
-            "full_page": True,
-            "type": "png",
-        }
-
-        # 5. Render
-        url = await self.html_render(template_str, render_data, options=options)
-        return url
 
     @filter.command_group("mai")
     async def mai(self):
@@ -939,13 +830,15 @@ MUNET munet MuNET""")
 
         try:
             assert entries is not None
-            image_url = await self._generate_b50_image(profile, entries, uid)
+            image_url = await self.b50_helper.generate_image(
+                self, profile, entries, uid
+            )
             chain = [Comp.Plain("这是你的B50数据~"), Comp.Image.fromURL(image_url)]
             yield event.chain_result(chain)
         except Exception as e:
             logger.error("Failed to generate B50 image: %s", e, exc_info=True)
             yield event.plain_result(
-                f"绘制失败了... 只能给你文字版了：\n{self._render_b50_summary(profile, entries)}"
+                f"绘制失败了... 只能给你文字版了：\n{self.b50_helper.render_summary(self, profile, entries)}"
             )
 
     @mai.command("ap50")
