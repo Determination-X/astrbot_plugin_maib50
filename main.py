@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup  # 用于解析HTML
 
 import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig, logger
-from astrbot.api.event import AstrMessageEvent, MessageChain, filter
+from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
 from astrbot.core.utils.astrbot_path import (
     get_astrbot_plugin_data_path,
@@ -837,13 +837,27 @@ MUNET munet MuNET""")
                 self, profile, entries, uid
             )
             if (
-                event.get_platform_name() == "discord"
-            ):  # 在Discord上，依靠yield进行被动发送图片会导致图片发送失败，正在对self.context.send_message(即主动发送)进行测试
-                umo = event.unified_msg_origin
-                message_chain = (
-                    MessageChain().message("这是你的B50数据~").url_image(image_url)
-                )
-                await self.context.send_message(umo, message_chain)
+                event.get_platform_name() == "discord" # Discord不支持http协议的图片链接，需要转为base64数据链接才能显示
+            ):
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(image_url) as resp:
+                            if resp.status == 200:
+                                image_data = await resp.read()
+                                yield event.plain_result("这是你的B50数据~")
+                                yield event.image_result(image_data)
+                            else:
+                                logger.error(
+                                    "Failed to fetch image for Discord: HTTP %s", resp.status
+                                )
+                                yield event.plain_result(
+                                    "图片生成成功，但无法获取图片数据，无法在Discord上显示图片了... 只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
+                                )
+                except Exception as e:
+                    logger.error("Failed to fetch image for Discord: %s", e, exc_info=True)
+                    yield event.plain_result(
+                        "图片生成失败了，无法在Discord上显示图片了... 只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
+                    )
             else:
                 chain = [Comp.Plain("这是你的B50数据~"), Comp.Image.fromURL(image_url)]
                 yield event.chain_result(chain)
@@ -897,11 +911,25 @@ MUNET munet MuNET""")
                 self, profile, entries, uid
             )
             if event.get_platform_name() == "discord":
-                umo = event.unified_msg_origin  # 在Discord上，依靠yield进行被动发送图片会导致图片发送失败，正在对self.context.send_message(即主动发送)进行测试
-                message_chain = (
-                    MessageChain().message("这是你的AP50数据~").url_image(image_url)
-                )
-                await self.context.send_message(umo, message_chain)
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(image_url) as resp:
+                            if resp.status == 200:
+                                image_data = await resp.read()
+                                yield event.plain_result("这是你的AP50数据~")
+                                yield event.image_result(image_data)
+                            else:
+                                logger.error(
+                                    "Failed to fetch image for Discord: HTTP %s", resp.status
+                                )
+                                yield event.plain_result(
+                                    "图片生成成功，但无法获取图片数据，无法在Discord上显示图片了... 只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
+                                )
+                except Exception as e:
+                    logger.error("Failed to fetch image for Discord: %s", e, exc_info=True)
+                    yield event.plain_result(
+                        "图片生成失败了，无法在Discord上显示图片了... 只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
+                    )
             else:
                 chain = [Comp.Plain("这是你的AP50数据~"), Comp.Image.fromURL(image_url)]
                 yield event.chain_result(chain)
