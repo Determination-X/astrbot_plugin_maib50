@@ -26,16 +26,17 @@ from .lookup import MaimaiLookupHelper
 # constants from astrbot framework:
 # self.name = astrbot_plugin_maib50
 help_text = """/mai可用指令:
-├─/mai b50
-├─/mai ap50
-├─/mai bind INT <好友码>
-│  /mai bind CN (开发中)
-│  /mai bind JP (暫定)
-│  /mai bind RIN (开发中)
-│  /mai bind MUNET (开发中)
-├─/mai unbind [服务器]
-├─/mai help
-└─/mai search <关键词>
+├──/mai b50
+├──/mai ap50
+├──/mai bind <服务器> <好友码>
+│   ├── INT
+│   │   CN (开发中)
+│   │   JP (暂定)
+│   │   RIN (开发中)
+│   │   MUNET (开发中)
+├──/mai unbind [服务器]
+├──/mai help
+└──/mai search <关键词>
 
 可用服务器:  国际服
 开发中:  国服 Rin服 MuNET
@@ -716,7 +717,7 @@ MUNET munet MuNET""")
         yield event.plain_result(f"成功绑定国际服好友码：{friend_code}")
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @mai.command("view-all-binds", alias={"查看所有绑定", "VAB"})
+    @mai.command("view-all-binds", alias={"查看所有绑定", "VAB", "vab"})
     async def mai_view_all_binds(self, event: AstrMessageEvent, force: str = ""):
         """管理员指令，查看所有绑定信息"""
         if event.get_group_id() != "" and force not in ["--force", "-f"]:
@@ -833,8 +834,12 @@ MUNET munet MuNET""")
             image_url = await self.b50_helper.generate_image(
                 self, profile, entries, uid
             )
-            chain = [Comp.Plain("这是你的B50数据~"), Comp.Image.fromURL(image_url)]
-            yield event.chain_result(chain)
+            if event.get_platform_name() == "discord": # Discord疑似不支持链式消息，先发文本后发图
+                yield event.plain_result("这是你的B50数据~")
+                yield event.image_result(image_url)
+            else:
+                chain = [Comp.Plain("这是你的B50数据~"), Comp.Image.fromURL(image_url)]
+                yield event.chain_result(chain)
         except Exception as e:
             logger.error("Failed to generate B50 image: %s", e, exc_info=True)
             yield event.plain_result(

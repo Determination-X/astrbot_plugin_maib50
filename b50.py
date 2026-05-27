@@ -34,9 +34,12 @@ class B50Helper:
         ]
         return current_version_floor, new_entries[:15], old_entries[:35]
 
-    def render_summary(self, plugin, profile: dict | None, entries: list[dict]) -> str:
+    def render_summary(self, plugin, profile: dict | None, entries: list[dict] | None) -> str:
         if profile is None:
             return "Failed to retrieve friend profile information."
+        
+        if entries is None:
+            return "Failed to retrieve friend chart information."
 
         current_version_floor, new_top, old_top = self.select_b50(plugin, entries)
         total_rating = sum(entry["rating"] for entry in new_top + old_top)
