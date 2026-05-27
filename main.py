@@ -34,7 +34,7 @@ help_text = """/mai可用指令:
 │   │   CN (开发中)
 │   │   JP (暂定)
 │   │   RIN (开发中)
-│   │   MUNET (开发中)
+│   ╵   MUNET (开发中)
 ├──/mai unbind [服务器]
 ├──/mai help
 └──/mai search <关键词>
@@ -74,7 +74,7 @@ RENDER_WIDTH = 3024
 RENDER_HEIGHT = 1700
 
 
-# Deprecated    @register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "1.0.1")
+# Deprecated    @register("astrbot_plugin_maib50", "诶嘿怪awa", "Maib50 国际服插件", "1.0.2")
 class MaiPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -800,15 +800,6 @@ MUNET munet MuNET""")
             )
             return
 
-        # maimai DX NET Maintainance Time: Every Tuesday 2:00-6:00 UTC+9
-        # now_gmt9 = datetime.now(timezone(timedelta(hours=9)))
-
-        # if now_gmt9.weekday() == 1 and 2 <= now_gmt9.hour < 6:
-        #    yield event.plain_result(
-        #        "现在是每周二的维护时间(02:00-06:00 UTC+9),暂时无法查询数据,请在维护结束后再试"
-        #    )
-        #    return
-
         platform_name = event.get_platform_name()
         uid = event.get_sender_id()
         row = self._get_binding(uid, platform_name, "INT")
@@ -848,7 +839,7 @@ MUNET munet MuNET""")
                                 message_chain.message("这是你的B50数据~")
                                 message_chain.base64_image(b64_str)
 
-                                await self.context.send_message(
+                                await self.context.send_message( # pyright: ignore[reportAttributeAccessIssue] not a problem at runtime, see https://docs.astrbot.app/en/dev/star/guides/send-message.html#active-messages
                                     event.unified_msg_origin, message_chain
                                 )
                             else:
@@ -933,7 +924,7 @@ MUNET munet MuNET""")
                                 message_chain.base64_image(b64_str)
 
                                 # 主動發送，完美繞過 yield event.image_result 的 startswith 限制
-                                await self.context.send_message(
+                                await self.context.send_message( # pyright: ignore[reportAttributeAccessIssue] not a problem at runtime, see https://docs.astrbot.app/en/dev/star/guides/send-message.html#active-messages
                                     event.unified_msg_origin, message_chain
                                 )
                             else:

@@ -34,7 +34,9 @@ class B50Helper:
         ]
         return current_version_floor, new_entries[:15], old_entries[:35]
 
-    def render_summary(self, plugin, profile: dict | None, entries: list[dict] | None) -> str:
+    def render_summary(
+        self, plugin, profile: dict | None, entries: list[dict] | None
+    ) -> str:
         if profile is None:
             return "Failed to retrieve friend profile information."
         if entries is None:

@@ -172,7 +172,9 @@ class MaimaiLookupHelper:
 
         token = plugin._extract_token_from_html(search_html)
         if not token:
-            return "未能在好友搜索页面解析到 token，无法发送好友请求"
+            return (
+                "未能在好友搜索页面解析到 token，无法发送好友请求/或者曾经添加过该好友"
+            )
 
         invite_headers = {
             "User-Agent": get_headers["User-Agent"],
@@ -208,7 +210,7 @@ class MaimaiLookupHelper:
             if invite_resp.status in (302, 303):
                 location = invite_resp.headers.get("Location", "")
                 logger.info("Friend request sent successfully, redirect=%s", location)
-                return "未添加好友，已发送好友请求，请等待对方批准"
+                return "未添加好友，已发送好友请求，请批准后重新执行/mai b50"
 
             invite_text = await invite_resp.text()
             if (
