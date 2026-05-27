@@ -839,7 +839,7 @@ MUNET munet MuNET""")
             if (
                 event.get_platform_name() == "discord"
             ):  # 在Discord上，依靠yield进行被动发送图片会导致图片发送失败，正在对self.context.send_message(即主动发送)进行测试
-                umo = event.unified_msg_object
+                umo = event.unified_msg_origin
                 message_chain = (
                     MessageChain().message("这是你的B50数据~").image(image_url)
                 )
@@ -897,7 +897,7 @@ MUNET munet MuNET""")
                 self, profile, entries, uid
             )
             if event.get_platform_name() == "discord":
-                umo = event.unified_msg_object  # 在Discord上，依靠yield进行被动发送图片会导致图片发送失败，正在对self.context.send_message(即主动发送)进行测试
+                umo = event.unified_msg_origin  # 在Discord上，依靠yield进行被动发送图片会导致图片发送失败，正在对self.context.send_message(即主动发送)进行测试
                 message_chain = (
                     MessageChain().message("这是你的AP50数据~").image(image_url)
                 )
