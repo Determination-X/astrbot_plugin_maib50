@@ -18,12 +18,15 @@ from astrbot.core.utils.astrbot_path import (
     get_astrbot_plugin_path,
 )
 
+from .ap50 import AP50Helper
 from .constant_table_manager import ConstantTableManager
+from .lookup import MaimaiLookupHelper
 
 # constants from astrbot framework:
 # self.name = astrbot_plugin_maib50
 help_text = """/mai可用指令:
 ├─/mai b50
+├─/mai ap50
 ├─/mai bind INT <好友码>
 │  /mai bind CN (开发中)
 │  /mai bind JP (暫定)
@@ -112,6 +115,8 @@ class MaiPlugin(Star):
         )
 
         self.template_path = self.plugin_path / "templates"
+        self.ap50_helper = AP50Helper(self.template_path)
+        self.lookup_helper = MaimaiLookupHelper()
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
@@ -888,7 +893,6 @@ MUNET munet MuNET""")
     @mai.command("b50")
     async def mai_b50(self, event: AstrMessageEvent):
         """查询maimai b50数据"""
-        # code for login and data fetching here
         bot_sid = self.sid
         bot_password = self.password
         if bot_sid == "":
@@ -920,282 +924,21 @@ MUNET munet MuNET""")
             )
             return
         _, friend_code = row
-        server = "INT"
 
         yield event.plain_result("正在查询数据，请稍候~")
-        # Login using aiohttp
-        login_url = "https://lng-tgk-aime-gw.am-all.net/common_auth/login/sid"
-        login_data = {"retention": "1", "sid": bot_sid, "password": bot_password}
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-            "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Cache-Control": "max-age=0",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Origin": "https://lng-tgk-aime-gw.am-all.net",
-            "Referer": "https://lng-tgk-aime-gw.am-all.net/common_auth/login?redirect_url=https%3A%2F%2Fmaimaidx-eng.com%2Fmaimai-mobile%2F&site_id=maimaidxex&back_url=https%3A%2F%2Fmaimai.sega.com%2F&alof=0",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "same-origin",
-            "Sec-Fetch-User": "?1",
-            "Sec-Ch-Ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Windows"',
-        }
+        error_message, profile, entries = await self.lookup_helper.fetch_friend_entries(
+            self,
+            bot_sid,
+            bot_password,
+            friend_code,
+            "b50",
+        )
+        if error_message:
+            yield event.plain_result(error_message)
+            return
 
-        login_page_url = "https://lng-tgk-aime-gw.am-all.net/common_auth/login?redirect_url=https%3A%2F%2Fmaimaidx-eng.com%2Fmaimai-mobile%2F&site_id=maimaidxex&back_url=https%3A%2F%2Fmaimai.sega.com%2F&alof=0"
-        get_headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-            "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Cache-Control": "max-age=0",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Sec-Ch-Ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Windows"',
-        }
-
-        async with aiohttp.ClientSession() as session:
-            try:
-                # Try to load cached cookies first
-                cached_cookies = self._load_cookies()
-                needs_login = True
-                logger.debug("Starting /mai b50 lookup for friend_code=%s", friend_code)
-
-                if cached_cookies:
-                    # Load cached cookies into session
-                    session.cookie_jar._cookies = cached_cookies  # pyright: ignore[reportAttributeAccessIssue]
-                    logger.debug("Loaded cached cookies for /mai b50 lookup")
-
-                    # Verify if cached cookies are still valid by making a test request
-                    test_url = "https://maimaidx-eng.com/maimai-mobile/home"
-                    async with session.get(
-                        test_url, allow_redirects=False
-                    ) as test_resp:
-                        logger.debug(
-                            "Cached cookie validation returned status=%s",
-                            test_resp.status,
-                        )
-                        if test_resp.status == 200:
-                            logger.debug("Cached cookies are still valid")
-                            needs_login = False
-                        else:
-                            logger.info("Cached cookies expired, logging in again")
-
-                if needs_login:
-                    logger.info("Executing maimai login flow for /mai b50")
-
-                    # First, GET the login page to establish session
-                    async with session.get(login_page_url, headers=get_headers) as resp:
-                        logger.debug("Login page GET returned status=%s", resp.status)
-                        if resp.status != 200:
-                            logger.error(
-                                "Failed to load login page, status=%s", resp.status
-                            )
-                            yield event.plain_result(
-                                f"获取登录页面失败，状态码: {resp.status}"
-                            )
-                            return
-
-                    # Then, POST the login data
-                    async with session.post(
-                        login_url,
-                        data=login_data,
-                        headers=headers,
-                        allow_redirects=True,
-                    ) as resp:
-                        final_url = str(resp.url)
-                        logger.debug(
-                            "Login POST returned status=%s final_url=%s history_len=%s",
-                            resp.status,
-                            final_url,
-                            len(resp.history),
-                        )
-
-                        # Check redirect history for ssid
-                        ssid = None
-                        for i, redirect_resp in enumerate(resp.history):
-                            location = redirect_resp.headers.get("Location", "")
-                            logger.debug("Login redirect[%s]=%s", i, location)
-                            if "ssid=" in location:
-                                ssid = (
-                                    location.split("ssid=")[1].split("&")[0]
-                                    if "&" in location.split("ssid=")[1]
-                                    else location.split("ssid=")[1]
-                                )
-                                break
-
-                        cookies = session.cookie_jar.filter_cookies(final_url)  # pyright: ignore[reportArgumentType]
-
-                        # Save cookies for future use
-                        self._save_cookies(session.cookie_jar)
-                        logger.debug("Saved cookies after successful login")
-
-                        if ssid:
-                            logger.info("Login succeeded with SSID from redirect")
-                        elif cookies.get("ssid"):
-                            logger.info("Login succeeded with SSID from cookie")
-                        elif (
-                            final_url == "https://maimaidx-eng.com/maimai-mobile/home/"
-                        ):
-                            logger.info("Login succeeded and reached maimai home page")
-                        else:
-                            logger.error(
-                                "Login failed after POST, status=%s final_url=%s",
-                                resp.status,
-                                final_url,
-                            )
-                            yield event.plain_result(f"登录失败，状态码: {resp.status}")
-                            return
-
-                # At this point, session has valid cookies, proceed with b50 data fetching
-                # Start with fetching friend profile to verify friend status
-                friend_bio_url = f"https://maimaidx-eng.com/maimai-mobile/friend/friendDetail/?idx={friend_code}"
-                async with session.get(
-                    friend_bio_url, headers=get_headers, allow_redirects=False
-                ) as friend_resp:
-                    logger.debug(
-                        "friendDetail returned status=%s url=%s",
-                        friend_resp.status,
-                        friend_resp.url,
-                    )
-                    if friend_resp.status == 200:
-                        logger.debug("Friend already exists in bot friend list")
-                    else:
-                        # Not a current friend: try to send a friend request using friendCode search and invite
-                        friend_search_url = f"https://maimaidx-eng.com/maimai-mobile/friend/search/searchUser/?friendCode={friend_code}"
-                        async with session.get(
-                            friend_search_url,
-                            headers={**get_headers, "Referer": friend_bio_url},
-                        ) as search_resp:
-                            logger.debug(
-                                "friend search returned status=%s url=%s",
-                                search_resp.status,
-                                search_resp.url,
-                            )
-                            if search_resp.status != 200:
-                                logger.error(
-                                    "Failed to load friend search page, status=%s",
-                                    search_resp.status,
-                                )
-                                yield event.plain_result(
-                                    f"获取好友搜索页面失败，状态码: {search_resp.status}"
-                                )
-                                return
-                            search_html = await search_resp.text()
-                        token = self._extract_token_from_html(search_html)
-                        if not token:
-                            yield event.plain_result(
-                                "未能在好友搜索页面解析到 token，无法发送好友请求"
-                            )
-                            return
-                        invite_url = "https://maimaidx-eng.com/maimai-mobile/friend/search/invite/"
-                        invite_headers = {
-                            "User-Agent": get_headers["User-Agent"],
-                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-                            "Accept-Language": get_headers["Accept-Language"],
-                            "Accept-Encoding": get_headers["Accept-Encoding"],
-                            "Cache-Control": "max-age=0",
-                            "Content-Type": "application/x-www-form-urlencoded",
-                            "Origin": "https://maimaidx-eng.com",
-                            "Referer": friend_search_url,
-                            "Upgrade-Insecure-Requests": "1",
-                            "Sec-Fetch-Dest": "document",
-                            "Sec-Fetch-Mode": "navigate",
-                            "Sec-Fetch-Site": "same-origin",
-                            "Sec-Fetch-User": "?1",
-                            "Sec-Ch-Ua": get_headers["Sec-Ch-Ua"],
-                            "Sec-Ch-Ua-Mobile": get_headers["Sec-Ch-Ua-Mobile"],
-                            "Sec-Ch-Ua-Platform": get_headers["Sec-Ch-Ua-Platform"],
-                        }
-                        invite_data = {"idx": friend_code, "token": token, "invite": ""}
-                        async with session.post(
-                            invite_url,
-                            data=invite_data,
-                            headers=invite_headers,
-                            allow_redirects=False,
-                        ) as invite_resp:
-                            logger.debug(
-                                "invite POST returned status=%s url=%s",
-                                invite_resp.status,
-                                invite_resp.url,
-                            )
-                            if invite_resp.status in (302, 303):
-                                location = invite_resp.headers.get("Location", "")
-                                logger.info(
-                                    "Friend request sent successfully, redirect=%s",
-                                    location,
-                                )
-                                yield event.plain_result(
-                                    "未添加好友，已发送好友请求，请等待对方批准"
-                                )
-                                return
-                            invite_text = await invite_resp.text()
-                            if (
-                                "already" in invite_text.lower()
-                                or "已添加" in invite_text
-                                or "请求已发送" in invite_text
-                            ):
-                                yield event.plain_result(
-                                    "好友已存在或好友请求已发送，请确认后再试"
-                                )
-                                return
-                            logger.error(
-                                "Failed to send friend request, status=%s",
-                                invite_resp.status,
-                            )
-                            yield event.plain_result(
-                                f"发送好友请求失败，状态码: {invite_resp.status}"
-                            )
-                            return
-
-                profile = None
-                entries = []
-                await self._ensure_constant_table_loaded(session)
-                for diff_index in range(5):
-                    diff_name = DIFF_LABELS.get(diff_index, str(diff_index))
-                    logger.debug("Fetching friend VS page for %s", diff_name)
-                    html = await self._fetch_friend_vs_page(
-                        session, friend_code, diff_index, get_headers
-                    )
-                    if profile is None:
-                        logger.debug("Parsing friend profile from first VS page")
-                        profile = self._extract_friend_profile(html)
-                    logger.debug("Parsing friend chart entries for %s", diff_name)
-                    parsed_entries = self._parse_friend_entries_from_html(
-                        html, diff_index
-                    )
-                    entries.extend(parsed_entries)
-                    logger.debug(
-                        "Parsed %s charts for %s (%s played)",
-                        len(parsed_entries),
-                        diff_name,
-                        sum(not entry["unplayed"] for entry in parsed_entries),
-                    )
-                entries = self._attach_constant_table_data(entries)
-                if profile is None:
-                    yield event.plain_result("Failed to parse profile")
-                    return
-                logger.info(
-                    "Parsed %s charts total (%s played)",
-                    len(entries),
-                    sum(not entry["unplayed"] for entry in entries),
-                )
-
-            except Exception as e:
-                logger.error("/mai b50 failed: %s", e, exc_info=True)
-                yield event.plain_result(f"登录出错: {str(e)}")
-                return
-
-        # code for image generation here
         try:
+            assert entries is not None
             image_url = await self._generate_b50_image(profile, entries, uid)
             chain = [Comp.Plain("这是你的B50数据~"), Comp.Image.fromURL(image_url)]
             yield event.chain_result(chain)
@@ -1203,6 +946,57 @@ MUNET munet MuNET""")
             logger.error("Failed to generate B50 image: %s", e, exc_info=True)
             yield event.plain_result(
                 f"绘制失败了... 只能给你文字版了：\n{self._render_b50_summary(profile, entries)}"
+            )
+
+    @mai.command("ap50")
+    async def mai_ap50(self, event: AstrMessageEvent):
+        """查询maimai ap50数据"""
+        bot_sid = self.sid
+        bot_password = self.password
+        if bot_sid == "":
+            yield event.plain_result(
+                "插件未配置BOT_SID，无法查询数据，请联系管理员配置好BOT_SID后再试"
+            )
+            return
+        if bot_password == "":
+            yield event.plain_result(
+                "插件未配置BOT_PASSWORD，无法查询数据，请联系管理员配置好BOT_PASSWORD后再试"
+            )
+            return
+
+        platform_name = event.get_platform_name()
+        uid = event.get_sender_id()
+        row = self._get_binding(uid, platform_name, "INT")
+        if not row:
+            yield event.plain_result(
+                "未绑定国际服好友码，请先使用 /mai bind INT <好友码> 绑定"
+            )
+            return
+        _, friend_code = row
+
+        yield event.plain_result("正在查询 AP50 数据，请稍候~")
+        error_message, profile, entries = await self.lookup_helper.fetch_friend_entries(
+            self,
+            bot_sid,
+            bot_password,
+            friend_code,
+            "ap50",
+        )
+        if error_message:
+            yield event.plain_result(error_message)
+            return
+
+        try:
+            assert entries is not None
+            image_url = await self.ap50_helper.generate_image(
+                self, profile, entries, uid
+            )
+            chain = [Comp.Plain("这是你的AP50数据~"), Comp.Image.fromURL(image_url)]
+            yield event.chain_result(chain)
+        except Exception as e:
+            logger.error("Failed to generate AP50 image: %s", e, exc_info=True)
+            yield event.plain_result(
+                f"绘制失败了... 只能给你文字版了：\n{self.ap50_helper.render_summary(self, profile, entries)}"
             )
 
     @mai.command("search", alias={"搜索"})
