@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup  # 用于解析HTML
 
 import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig, logger
-from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star
 from astrbot.core.utils.astrbot_path import (
     get_astrbot_plugin_data_path,
@@ -836,27 +836,35 @@ MUNET munet MuNET""")
             image_url = await self.b50_helper.generate_image(
                 self, profile, entries, uid
             )
-            if (
-                event.get_platform_name() == "discord" # Discord不支持http协议的图片链接，需要转为base64数据链接才能显示
-            ):
+            if event.get_platform_name() == "discord":
                 try:
                     async with aiohttp.ClientSession() as session:
                         async with session.get(image_url) as resp:
                             if resp.status == 200:
                                 image_data = await resp.read()
-                                yield event.plain_result("这是你的B50数据~")
-                                yield event.image_result(image_data)
+                                b64_str = b64encode(image_data).decode("utf-8")
+
+                                message_chain = MessageChain()
+                                message_chain.message("这是你的B50数据~")
+                                message_chain.base64_image(b64_str)
+
+                                await self.context.send_message(
+                                    event.unified_msg_origin, message_chain
+                                )
                             else:
                                 logger.error(
-                                    "Failed to fetch image for Discord: HTTP %s", resp.status
+                                    "Failed to fetch image for Discord: HTTP %s",
+                                    resp.status,
                                 )
                                 yield event.plain_result(
-                                    "图片生成成功，但无法获取图片数据，无法在Discord上显示图片了... 只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
+                                    "图片生成成功，但无法获取图片数据...只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
                                 )
                 except Exception as e:
-                    logger.error("Failed to fetch image for Discord: %s", e, exc_info=True)
+                    logger.error(
+                        "Failed to fetch image for Discord: %s", e, exc_info=True
+                    )
                     yield event.plain_result(
-                        "图片生成失败了，无法在Discord上显示图片了... 只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
+                        "图片生成失败了...只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
                     )
             else:
                 chain = [Comp.Plain("这是你的B50数据~"), Comp.Image.fromURL(image_url)]
@@ -916,19 +924,32 @@ MUNET munet MuNET""")
                         async with session.get(image_url) as resp:
                             if resp.status == 200:
                                 image_data = await resp.read()
-                                yield event.plain_result("这是你的AP50数据~")
-                                yield event.image_result(image_data)
+                                # 轉成 Base64 字串
+                                b64_str = b64encode(image_data).decode("utf-8")
+
+                                # 使用分行建構，避免鏈式調用可能產生的 NoneType 錯誤
+                                message_chain = MessageChain()
+                                message_chain.message("这是你的AP50数据~")
+                                message_chain.base64_image(b64_str)
+
+                                # 主動發送，完美繞過 yield event.image_result 的 startswith 限制
+                                await self.context.send_message(
+                                    event.unified_msg_origin, message_chain
+                                )
                             else:
                                 logger.error(
-                                    "Failed to fetch image for Discord: HTTP %s", resp.status
+                                    "Failed to fetch image for Discord: HTTP %s",
+                                    resp.status,
                                 )
                                 yield event.plain_result(
-                                    "图片生成成功，但无法获取图片数据，无法在Discord上显示图片了... 只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
+                                    "图片生成成功，但无法获取图片数据...只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
                                 )
                 except Exception as e:
-                    logger.error("Failed to fetch image for Discord: %s", e, exc_info=True)
+                    logger.error(
+                        "Failed to fetch image for Discord: %s", e, exc_info=True
+                    )
                     yield event.plain_result(
-                        "图片生成失败了，无法在Discord上显示图片了... 只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
+                        "图片生成失败了...只能给你文字版了... 哦不对，Discord上不能发超过2000字符的消息，所以文本也发不出来(悲)"
                     )
             else:
                 chain = [Comp.Plain("这是你的AP50数据~"), Comp.Image.fromURL(image_url)]
