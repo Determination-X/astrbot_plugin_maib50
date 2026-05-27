@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup  # 用于解析HTML
 
 import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig, logger
-from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star
 from astrbot.core.utils.astrbot_path import (
     get_astrbot_plugin_data_path,
@@ -836,9 +836,10 @@ MUNET munet MuNET""")
             image_url = await self.b50_helper.generate_image(
                 self, profile, entries, uid
             )
-            if event.get_platform_name() == "discord": # Discord疑似不支持链式消息，先发文本后发图
-                yield event.plain_result("这是你的B50数据~")
-                yield event.image_result(image_url)
+            if event.get_platform_name() == "discord":  # 在Discord上，依靠yield进行被动发送图片会导致图片发送失败，正在对self.context.send_message(即主动发送)进行测试
+                umo = event.unified_msg_object
+                message_chain = MessageChain().message("这是你的B50数据~").image(image_url)
+                await self.context.send_message(umo, message_chain)
             else:
                 chain = [Comp.Plain("这是你的B50数据~"), Comp.Image.fromURL(image_url)]
                 yield event.chain_result(chain)
@@ -891,9 +892,10 @@ MUNET munet MuNET""")
             image_url = await self.ap50_helper.generate_image(
                 self, profile, entries, uid
             )
-            if event.get_platform_name() == "discord": # Discord疑似不支持链式消息，先发文本后发图
-                yield event.plain_result("这是你的AP50数据~")
-                yield event.image_result(image_url)
+            if event.get_platform_name() == "discord": 
+                umo = event.unified_msg_object # 在Discord上，依靠yield进行被动发送图片会导致图片发送失败，正在对self.context.send_message(即主动发送)进行测试
+                message_chain = MessageChain().message("这是你的AP50数据~").image(image_url)
+                await self.context.send_message(umo, message_chain)
             else:
                 chain = [Comp.Plain("这是你的AP50数据~"), Comp.Image.fromURL(image_url)]
                 yield event.chain_result(chain)
