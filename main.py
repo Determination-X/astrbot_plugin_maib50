@@ -889,8 +889,12 @@ MUNET munet MuNET""")
             image_url = await self.ap50_helper.generate_image(
                 self, profile, entries, uid
             )
-            chain = [Comp.Plain("这是你的AP50数据~"), Comp.Image.fromURL(image_url)]
-            yield event.chain_result(chain)
+            if event.get_platform_name() == "discord": # Discord疑似不支持链式消息，先发文本后发图
+                yield event.plain_result("这是你的AP50数据~")
+                yield event.image_result(image_url)
+            else:
+                chain = [Comp.Plain("这是你的AP50数据~"), Comp.Image.fromURL(image_url)]
+                yield event.chain_result(chain)
         except Exception as e:
             logger.error("Failed to generate AP50 image: %s", e, exc_info=True)
             yield event.plain_result(
