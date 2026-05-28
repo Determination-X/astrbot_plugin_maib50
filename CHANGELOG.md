@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.2 (2026-05-22)
+## 1.2.0 (2026-05-22)
 
 ### 修复 / Fix
 
@@ -12,7 +12,7 @@
 - /mai ap50命令，查询ap50(ALL PERFECT 50)相关信息
 - /mai ap50 command, to query information related to ap50(ALL PERFECT 50)
 
-## 1.0.1 (2024-06-01)
+## 1.1.0 (2024-06-01)
 
 ### 优化 / Optimize
 
