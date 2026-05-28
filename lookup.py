@@ -210,7 +210,7 @@ class MaimaiLookupHelper:
             if invite_resp.status in (302, 303):
                 location = invite_resp.headers.get("Location", "")
                 logger.info("Friend request sent successfully, redirect=%s", location)
-                return "未添加好友，已发送好友请求，请批准后重新执行/mai b50"
+                return "未添加好友，已发送好友请求，请批准后重新执行命令"
 
             invite_text = await invite_resp.text()
             if (
