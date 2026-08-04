@@ -1,10 +1,12 @@
 import json
 import re
 import unicodedata
+from functools import lru_cache
+from pathlib import Path
 
 import aiohttp
 
-# from astrbot.api import logger
+from astrbot.api import logger
 
 MUSIC_EX_URL = (
     "https://raw.githubusercontent.com/zvuc/otoge-db/master/maimai/data/music-ex.json"
@@ -12,6 +14,26 @@ MUSIC_EX_URL = (
 MUSIC_EX_URL_INT = "https://raw.githubusercontent.com/zvuc/otoge-db/master/maimai/data/music-ex-intl.json"
 BASE_FIELDS = ("title", "version", "image_url")
 CONSTANT_FIELD_PATTERN = re.compile(r"^(?:dx_)?lev_(?:bas|adv|exp|mas|remas)_i$")
+TITLE_ALIASES_PATH = Path(__file__).with_name("title_aliases.json")
+
+
+@lru_cache(maxsize=1)
+def _load_title_aliases() -> dict[str, str]:
+    try:
+        with TITLE_ALIASES_PATH.open(encoding="utf-8") as file:
+            aliases = json.load(file)
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("Failed to load title aliases: %s", exc)
+        return {}
+
+    if not isinstance(aliases, dict):
+        logger.warning("Title aliases file must contain a JSON object")
+        return {}
+    return {
+        alias: title
+        for alias, title in aliases.items()
+        if isinstance(alias, str) and isinstance(title, str)
+    }
 
 
 class ConstantTableManager:
@@ -70,7 +92,11 @@ class ConstantTableManager:
                 f"No source URL configured for {self.table_selection} constant table"
             )
 
-        #       logger.debug("Fetching maimai constant table from %s (selection=%s)", selected_url, self.table_selection)
+        logger.debug(
+            "Fetching maimai constant table from %s (selection=%s)",
+            selected_url,
+            self.table_selection,
+        )
         async with session.get(selected_url) as response:
             response.raise_for_status()
             payload_text = await response.text()
@@ -100,7 +126,7 @@ class ConstantTableManager:
                     entry
                 )
 
-        #        logger.info("Loaded %s constant table entries", len(extracted_entries))
+        logger.debug("Loaded %s constant table entries", len(extracted_entries))
         return extracted_entries
 
     def find_by_title(self, title: str) -> list[dict[str, str]]:
@@ -121,18 +147,7 @@ class ConstantTableManager:
         return []
 
     def _find_by_alias(self, title: str) -> list[dict[str, str]]:
-        alias_map = {
-            "ずんだもんの朝食 〜目覚ましずんラップ〜": "ずんだもんの朝食～目覚ましずんラップ～",
-            "チルノのパーフェクトさんすう教室 ⑨周年バージョン": "チルノのパーフェクトさんすう教室 9周年バージョン",
-            "セイクリッド ルイン": "セイクリッド ルイン (jubeat VERSION)",
-            "ぼくたちいつでも しゅわっしゅわ！": "ぼくたちいつでも しゅわっしゅわ!",
-            "D✪N’T ST✪P R✪CKIN’": "DON'T STOP ROCKIN'",
-            "バーチャルダム ネーション": "バーチャルダムネーション",
-            "全世界共通リズム感テスト": "全世界共通リズム感テスト -SEKAI NO MINNA DE RYTHM KAN TEST-",
-            "オーケー？ オーライ！": "オーケー? オーライ!",
-        }
-
-        alias_title = alias_map.get(title)
+        alias_title = _load_title_aliases().get(title)
         if not alias_title:
             return []
 

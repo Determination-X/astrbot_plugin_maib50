@@ -1,5 +1,5 @@
 import os
-import pickle  # 用于保存和加载cookies
+import pickle
 import re
 import sqlite3  # 存储绑定信息的数据库
 from base64 import b64encode
@@ -175,24 +175,23 @@ class MaiPlugin(Star):
                     return match
         return matches[0]
 
-    def _load_cookies(self):
+    def _load_cookies(self, jar: aiohttp.CookieJar) -> bool:
         """从文件加载保存的cookies"""
         try:
-            if os.path.exists(self.cookies_path):
-                with open(self.cookies_path, "rb") as f:
-                    return pickle.load(f)
-        except Exception as e:
-            logger.warning(f"Failed to load cookies: {e}")
-        return None
+            if self.cookies_path.exists():
+                jar.load(self.cookies_path)
+                return True
+        except (OSError, pickle.PickleError) as exc:
+            logger.warning("Failed to load cookies: %s", exc)
+        return False
 
-    def _save_cookies(self, jar):
+    def _save_cookies(self, jar: aiohttp.CookieJar) -> None:
         """保存cookies到文件"""
         try:
-            os.makedirs(os.path.dirname(self.cookies_path), exist_ok=True)
-            with open(self.cookies_path, "wb") as f:
-                pickle.dump(jar._cookies, f)
-        except Exception as e:
-            logger.warning(f"Failed to save cookies: {e}")
+            self.cookies_path.parent.mkdir(parents=True, exist_ok=True)
+            jar.save(self.cookies_path)
+        except (OSError, pickle.PickleError) as exc:
+            logger.warning("Failed to save cookies: %s", exc)
 
     def _file_to_data_uri(self, file_path: Path) -> str:
         try:
@@ -839,7 +838,7 @@ MUNET munet MuNET""")
                                 message_chain.message("这是你的B50数据~")
                                 message_chain.base64_image(b64_str)
 
-                                await self.context.send_message( # pyright: ignore[reportAttributeAccessIssue] not a problem at runtime, see https://docs.astrbot.app/en/dev/star/guides/send-message.html#active-messages
+                                await self.context.send_message(  # pyright: ignore[reportAttributeAccessIssue] not a problem at runtime, see https://docs.astrbot.app/en/dev/star/guides/send-message.html#active-messages
                                     event.unified_msg_origin, message_chain
                                 )
                             else:
@@ -924,7 +923,7 @@ MUNET munet MuNET""")
                                 message_chain.base64_image(b64_str)
 
                                 # 主動發送，完美繞過 yield event.image_result 的 startswith 限制
-                                await self.context.send_message( # pyright: ignore[reportAttributeAccessIssue] not a problem at runtime, see https://docs.astrbot.app/en/dev/star/guides/send-message.html#active-messages
+                                await self.context.send_message(  # pyright: ignore[reportAttributeAccessIssue] not a problem at runtime, see https://docs.astrbot.app/en/dev/star/guides/send-message.html#active-messages
                                     event.unified_msg_origin, message_chain
                                 )
                             else:

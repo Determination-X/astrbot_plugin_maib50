@@ -1,45 +1,42 @@
 import aiohttp
+from yarl import URL
 
 from astrbot.api import logger
 
 
 class MaimaiLookupHelper:
-    def _build_login_headers(self) -> dict[str, str]:
+    def _base_headers(self) -> dict[str, str]:
         return {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
             "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
             "Accept-Encoding": "gzip, deflate, br, zstd",
             "Cache-Control": "max-age=0",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Origin": "https://lng-tgk-aime-gw.am-all.net",
-            "Referer": "https://lng-tgk-aime-gw.am-all.net/common_auth/login?redirect_url=https%3A%2F%2Fmaimaidx-eng.com%2Fmaimai-mobile%2F&site_id=maimaidxex&back_url=https%3A%2F%2Fmaimai.sega.com%2F&alof=0",
             "Upgrade-Insecure-Requests": "1",
             "Sec-Fetch-Dest": "document",
             "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "same-origin",
             "Sec-Fetch-User": "?1",
             "Sec-Ch-Ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
             "Sec-Ch-Ua-Mobile": "?0",
             "Sec-Ch-Ua-Platform": '"Windows"',
         }
 
+    def _build_login_headers(self) -> dict[str, str]:
+        headers = self._base_headers()
+        headers.update(
+            {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Origin": "https://lng-tgk-aime-gw.am-all.net",
+                "Referer": "https://lng-tgk-aime-gw.am-all.net/common_auth/login?redirect_url=https%3A%2F%2Fmaimaidx-eng.com%2Fmaimai-mobile%2F&site_id=maimaidxex&back_url=https%3A%2F%2Fmaimai.sega.com%2F&alof=0",
+                "Sec-Fetch-Site": "same-origin",
+            }
+        )
+        return headers
+
     def _build_get_headers(self) -> dict[str, str]:
-        return {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-            "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Cache-Control": "max-age=0",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Sec-Ch-Ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Windows"',
-        }
+        headers = self._base_headers()
+        headers["Sec-Fetch-Site"] = "none"
+        return headers
 
     async def _ensure_logged_in(
         self,
@@ -55,11 +52,9 @@ class MaimaiLookupHelper:
         login_headers = self._build_login_headers()
         get_headers = self._build_get_headers()
 
-        cached_cookies = plugin._load_cookies()
         needs_login = True
 
-        if cached_cookies:
-            session.cookie_jar._cookies = cached_cookies  # pyright: ignore[reportAttributeAccessIssue]
+        if plugin._load_cookies(session.cookie_jar):
             logger.debug("Loaded cached cookies for /mai %s lookup", command_label)
 
             test_url = "https://maimaidx-eng.com/maimai-mobile/home"
@@ -111,7 +106,7 @@ class MaimaiLookupHelper:
                     )
                     break
 
-            cookies = session.cookie_jar.filter_cookies(final_url)  # pyright: ignore[reportArgumentType]
+            cookies = session.cookie_jar.filter_cookies(URL(final_url))
             plugin._save_cookies(session.cookie_jar)
             logger.debug("Saved cookies after successful login")
 
@@ -176,24 +171,15 @@ class MaimaiLookupHelper:
                 "未能在好友搜索页面解析到 token，无法发送好友请求/或者曾经添加过该好友"
             )
 
-        invite_headers = {
-            "User-Agent": get_headers["User-Agent"],
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-            "Accept-Language": get_headers["Accept-Language"],
-            "Accept-Encoding": get_headers["Accept-Encoding"],
-            "Cache-Control": "max-age=0",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Origin": "https://maimaidx-eng.com",
-            "Referer": friend_search_url,
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "same-origin",
-            "Sec-Fetch-User": "?1",
-            "Sec-Ch-Ua": get_headers["Sec-Ch-Ua"],
-            "Sec-Ch-Ua-Mobile": get_headers["Sec-Ch-Ua-Mobile"],
-            "Sec-Ch-Ua-Platform": get_headers["Sec-Ch-Ua-Platform"],
-        }
+        invite_headers = self._base_headers()
+        invite_headers.update(
+            {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Origin": "https://maimaidx-eng.com",
+                "Referer": friend_search_url,
+                "Sec-Fetch-Site": "same-origin",
+            }
+        )
         invite_data = {"idx": friend_code, "token": token, "invite": ""}
         invite_url = "https://maimaidx-eng.com/maimai-mobile/friend/search/invite/"
         async with session.post(
