@@ -963,18 +963,21 @@ MUNET munet MuNET""")
             try:
                 await self._ensure_constant_table_loaded(session)
 
-                # Search through entries
-                keyword_lower = keyword.lower()
-                matching_entries = []
+                # Prioritize exact song titles and aliases, including special-character
+                # compatibility mappings (e.g. RONDO -> RONDØ).
+                keyword = keyword.strip()
+                matching_entries = self.constant_table_manager.find_by_title(keyword)
 
-                for entry in self.constant_table_manager.entries:
-                    title = entry.get("title", "").lower()
-                    # Search by title or version
-                    if (
-                        keyword_lower in title
-                        or keyword_lower in entry.get("version", "").lower()
-                    ):
-                        matching_entries.append(entry)
+                if not matching_entries:
+                    keyword_lower = keyword.casefold()
+                    matching_entries = [
+                        entry
+                        for entry in self.constant_table_manager.entries
+                        if (
+                            keyword_lower in entry.get("title", "").casefold()
+                            or keyword_lower in entry.get("version", "").casefold()
+                        )
+                    ]
 
                 if not matching_entries:
                     yield event.plain_result(f"未找到匹配 '{keyword}' 的歌曲~")
