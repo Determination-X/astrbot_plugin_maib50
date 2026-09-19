@@ -32,7 +32,9 @@ Python依赖会由Astrbot自动依照开发者提供的`requirements.txt`管理
 - `/mai ap50`：查询当前绑定好友码的国际服 `AP50`，包含 `AP` 和 `AP+` 谱面。
 - `/mai bind <服务器> <好友码>` / `/mai 绑定 <服务器> <好友码>`：绑定好友码。
 - `/mai unbind [服务器]` / `/mai 解绑 [服务器]`：解绑当前平台上的好友码；不填服务器时解绑当前平台下全部记录。
-- `/mai search <关键词>` / `/mai 搜索 <关键词>`：按标题或版本搜索当前定数表中的歌曲与定数。
+- `/mai search <关键词>` / `/mai 搜索 <关键词>`：按完整标题、别名或版本搜索歌曲与定数。
+- `/mai alias submit <别名> "<完整曲名>"`：用户提交别名申请；`/mai alias list [关键词]`：查看实例别名。
+- `/mai alias add/del/pending/approve/reject`：管理员添加、删除和审核别名（`/mai alias help` 查看格式）。
 - `/mai view-all-binds [--force|-f]`：管理员查看全部绑定；默认仅允许私聊中使用。
 - `/mai reload-constant-table [JP|INT]`：管理员强制刷新定数表，并可顺便切换表版本。
 - `/mai help`：查看帮助。
@@ -100,11 +102,13 @@ Python依赖会由Astrbot自动依照开发者提供的`requirements.txt`管理
 - 配置中选择默认使用 `JP` 或 `INT`
 - 管理员命令临时切换并刷新
 - 标题规范化匹配
-- 歌曲别名与已知异名映射，统一维护于 `title_aliases.json`
+- 实例本地歌曲别名与特殊字符兼容映射，统一维护于插件数据目录的 `title_aliases.json`
 
-`/mai search` 会优先匹配完整曲名和别名，再按曲名或版本进行原有的模糊搜索。别名不区分英文字母大小写，并兼容 Unicode/空格的常见写法，例如 `ieo` → `INFiNiTE ENERZY -Overdoze-`、`最水15` → `PANDORA PARADOXXX`、`RONDO` → `RONDØ`。
+`/mai search` 优先匹配完整曲名与别名，再按曲名或版本模糊搜索。别名支持大小写、Unicode 与空白字符规范化；多条别名可以指向同一歌曲。别名必须指向当前所选 INT/JP 定数表内存在的完整曲名，不能补齐上游尚未收录的新歌。
 
-新增别名时，在插件目录的 `title_aliases.json` 中添加 `"别名": "定数表内的完整曲名"`，重启插件以重新载入。别名必须指向当前所选 INT/JP 定数表内存在的曲目；别名不能补齐上游尚未收录的新歌。如果定数表和官网曲名不完全一致，插件会通过规范化与别名表匹配；仍匹配不到的谱面不会参与评分。
+首次启动时会自动在 `data/plugin_data/astrbot_plugin_maib50/title_aliases.json` 创建空对象 `{}`，已有文件则直接读取，绝不覆盖。仓库不再附带别名库；升级到 1.3.1 **不会自动复制或迁移**旧插件目录中的别名。如需保留 v1.3.0 的自定义内容，请在更新前手动备份并放入插件数据目录。别名库中的保存格式为 `"别名": "定数表内的完整曲名"`。
+
+用户可提交 `/mai alias submit ieo "INFiNiTE ENERZY -Overdoze-"`；管理员使用 `/mai alias pending`、`/mai alias approve <编号>` 或 `/mai alias reject <编号>` 审核，也可用 `/mai alias add <别名> "<完整曲名>"` 直接添加、`/mai alias del <别名>` 删除。完整曲名含空格时请使用双引号。批准/添加后立即写入数据目录并更新内存索引，**无需重载插件**；手动直接编辑 JSON 后仍需重载才会重新读取。
 
 ## 图片渲染
 
@@ -134,6 +138,8 @@ Python依赖会由Astrbot自动依照开发者提供的`requirements.txt`管理
 
 - `bindings.db`
 - `cookies.pkl`
+- `title_aliases.json`（实例别名库，首次启动自动创建）
+- `alias_requests.json`（有待审申请时创建）
 - `static/jacket/*`（需要你手动放入曲绘资源，来源: [otoge-db](https://github.com/zvuc/otoge-db/tree/master/maimai/jacket)）
 
 其中：

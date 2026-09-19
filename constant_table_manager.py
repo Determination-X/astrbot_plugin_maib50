@@ -1,12 +1,10 @@
-import json
 import re
-import unicodedata
-from functools import lru_cache
-from pathlib import Path
 
 import aiohttp
 
 from astrbot.api import logger
+
+from .alias_manager import AliasManager, normalize_title
 
 MUSIC_EX_URL = (
     "https://raw.githubusercontent.com/zvuc/otoge-db/master/maimai/data/music-ex.json"
@@ -14,34 +12,13 @@ MUSIC_EX_URL = (
 MUSIC_EX_URL_INT = "https://raw.githubusercontent.com/zvuc/otoge-db/master/maimai/data/music-ex-intl.json"
 BASE_FIELDS = ("title", "version", "image_url")
 CONSTANT_FIELD_PATTERN = re.compile(r"^(?:dx_)?lev_(?:bas|adv|exp|mas|remas)_i$")
-TITLE_ALIASES_PATH = Path(__file__).with_name("title_aliases.json")
-
-
-@lru_cache(maxsize=1)
-def _load_title_aliases() -> dict[str, str]:
-    try:
-        with TITLE_ALIASES_PATH.open(encoding="utf-8") as file:
-            aliases = json.load(file)
-    except (OSError, json.JSONDecodeError) as exc:
-        logger.warning("Failed to load title aliases: %s", exc)
-        return {}
-
-    if not isinstance(aliases, dict):
-        logger.warning("Title aliases file must contain a JSON object")
-        return {}
-    return {
-        alias: title
-        for alias, title in aliases.items()
-        if isinstance(alias, str) and isinstance(title, str)
-    }
-
-
 class ConstantTableManager:
     def __init__(
         self,
         source_url: str | None = None,
         source_url_int: str | None = None,
         table_selection: str = "INT",
+        alias_manager: AliasManager | None = None,
     ):
         """
         Initialize ConstantTableManager.
@@ -54,6 +31,7 @@ class ConstantTableManager:
         self.source_url = source_url or MUSIC_EX_URL  # JP table
         self.source_url_int = source_url_int or MUSIC_EX_URL_INT  # INT table
         self.table_selection = table_selection.upper()
+        self.alias_manager = alias_manager
         self._entries: list[dict[str, str]] = []
         self._title_index: dict[str, list[dict[str, str]]] = {}
         self._normalized_title_index: dict[str, list[dict[str, str]]] = {}
@@ -147,40 +125,18 @@ class ConstantTableManager:
         return []
 
     def _find_by_alias(self, title: str) -> list[dict[str, str]]:
-        aliases = _load_title_aliases()
-        alias_title = aliases.get(title)
-        if not alias_title:
-            normalized_query = self._normalize_title(title).casefold()
-            alias_title = next(
-                (
-                    target
-                    for alias, target in aliases.items()
-                    if self._normalize_title(alias).casefold() == normalized_query
-                ),
-                None,
-            )
+        alias_title = self.alias_manager.get_title(title) if self.alias_manager else None
         if not alias_title:
             return []
 
         direct = self._title_index.get(alias_title, [])
         if direct:
             return list(direct)
-
         normalized = self._normalize_title(alias_title)
-        if not normalized:
-            return []
         return list(self._normalized_title_index.get(normalized, []))
 
     def _normalize_title(self, text: str) -> str:
-        normalized = unicodedata.normalize("NFKC", text)
-        normalized = normalized.replace("〜", "~").replace("～", "~")
-        normalized = normalized.replace("’", "'").replace("‘", "'")
-        normalized = normalized.replace("“", '"').replace("”", '"')
-        normalized = normalized.replace("？", "?").replace("！", "!")
-        normalized = normalized.replace("　", " ")
-        normalized = normalized.replace("✪", "")
-        normalized = re.sub(r"\s+", " ", normalized).strip()
-        return normalized
+        return normalize_title(text)
 
     def _extract_entry(self, raw_entry: dict) -> dict[str, str]:
         entry: dict[str, str] = {}

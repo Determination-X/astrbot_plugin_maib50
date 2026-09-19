@@ -47,6 +47,12 @@ Python dependencies are automatically managed by AstrBot using the provided `req
 - `/mai search <keyword>` / `/mai 搜索 <keyword>`  
   Search songs and constants in the currently loaded constant table by title, alias, or version.
 
+- `/mai alias submit <alias> "<full song title>"` / `/mai alias list [keyword]`  
+  Submit a song alias for moderation or list instance aliases.
+
+- `/mai alias add/del/pending/approve/reject`  
+  Admin alias management; see `/mai alias help` for syntax.
+
 - `/mai view-all-binds [--force|-f]`  
   Administrator command to view all bindings. By default, this can only be used in private chats.
 
@@ -125,11 +131,11 @@ Current support includes:
 - Choosing default table version (`JP` or `INT`)
 - Temporary switching and refreshing through admin command
 - Title normalization matching
-- Song aliases and known title-compatibility mappings, maintained together in `title_aliases.json`
+- Instance-local aliases and compatibility mappings are stored in `data/plugin_data/astrbot_plugin_maib50/title_aliases.json`. On first startup the plugin creates an empty `{}` file, or loads the existing file without overwriting it. The repository no longer ships an alias JSON file; **v1.3.1 does not automatically migrate the previous plugin-directory file**. Back up and place any existing v1.3.0 aliases in the plugin data directory before upgrading.
 
-`/mai search` prioritizes exact song titles and aliases, then falls back to substring matching on titles or versions. Alias matching is case-insensitive for Latin letters and normalizes common Unicode and whitespace differences. Examples: `ieo` → `INFiNiTE ENERZY -Overdoze-`, `最水15` → `PANDORA PARADOXXX`, and `RONDO` → `RONDØ`.
+`/mai search` prioritizes exact song titles and aliases, then falls back to title/version substring search. Alias lookups normalize case, Unicode and whitespace. Multiple aliases may point to one song, but targets must be actual song titles in the currently selected INT/JP table; aliases do not add missing upstream songs.
 
-To add an alias, add an entry of the form `"alias": "full song title in the constant table"` to `title_aliases.json` in the plugin directory and restart the plugin to reload it. The target song must exist in the selected INT/JP constant table: aliases do not supply songs missing from upstream data. The same mappings also help match chart titles from DX NET to the constant table for B50/AP50; unmatched charts are excluded from rating calculations.
+Users can submit `/mai alias submit ieo "INFiNiTE ENERZY -Overdoze-"`. Admins may review with `/mai alias pending`, `/mai alias approve <id>`, `/mai alias reject <id>`, add directly with `/mai alias add <alias> "<full song title>"` or delete with `/mai alias del <alias>`. Quote multiword titles. Changes made through commands take effect immediately with no plugin reload; manually editing the JSON file still requires a reload.
 
 ## Image Rendering
 

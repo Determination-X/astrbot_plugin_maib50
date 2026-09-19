@@ -18,6 +18,7 @@ from astrbot.core.utils.astrbot_path import (
     get_astrbot_plugin_path,
 )
 
+from .alias_manager import AliasError, AliasManager, alias_key
 from .ap50 import AP50Helper
 from .b50 import B50Helper
 from .constant_table_manager import ConstantTableManager
@@ -36,6 +37,7 @@ help_text = """/mai可用指令:
 │   │   RIN (开发中)
 │   ╵   MUNET (开发中)
 ├──/mai unbind [服务器]
+├──/mai alias [submit|add|del|list|pending|approve|reject]
 ├──/mai help
 └──/mai search <关键词>
 [可选参数] <必选参数>
@@ -114,8 +116,10 @@ class MaiPlugin(Star):
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self._ensure_bindings_table()
+        self.alias_manager = AliasManager(self.plugin_data_path)
         self.constant_table_manager = ConstantTableManager(
-            table_selection=self.constant_table_selection
+            table_selection=self.constant_table_selection,
+            alias_manager=self.alias_manager,
         )
 
         self.template_path = self.plugin_path / "templates"
@@ -949,6 +953,137 @@ MUNET munet MuNET""")
             yield event.plain_result(
                 f"绘制失败了... 只能给你文字版了：\n{self.ap50_helper.render_summary(self, profile, entries)}"
             )
+
+    async def _resolve_alias_target(self, requested_title: str) -> str:
+        """Only accept an actual song title, not another alias or a fuzzy match."""
+        if not requested_title.strip():
+            raise AliasError("请输入目标曲名。")
+        async with aiohttp.ClientSession() as session:
+            await self._ensure_constant_table_loaded(session)
+        manager = self.constant_table_manager
+        matches = manager._title_index.get(requested_title, [])
+        if not matches:
+            key = manager._normalize_title(requested_title)
+            matches = manager._normalized_title_index.get(key, [])
+        titles = {entry["title"] for entry in matches}
+        if not titles:
+            raise AliasError(
+                "目标曲名不在当前定数表中；请使用完整曲名，不支持用另一个别名作为目标。"
+            )
+        if len(titles) != 1:
+            raise AliasError("曲名匹配到多首不同歌曲，请使用更准确的曲名。")
+        return next(iter(titles))
+
+    @mai.command("alias", alias={"别名"})
+    async def mai_alias(
+        self,
+        event: AstrMessageEvent,
+        action: str = "",
+        alias: str = "",
+        title: str = "",
+    ):
+        """Instance-local alias submission and administration.
+
+        Multiword song titles must be enclosed in quotes.
+        """
+        usage = (
+            '用法：\n'
+            '/mai alias submit <别名> "<完整曲名>"（用户提交申请）\n'
+            '/mai alias list [关键词]\n'
+            '/mai alias add <别名> "<完整曲名>"（管理员直接添加）\n'
+            '/mai alias del <别名>（管理员删除）\n'
+            '/mai alias pending（管理员查看待审）\n'
+            '/mai alias approve <编号> / reject <编号>（管理员审核）'
+        )
+        action = action.casefold()
+        if not action or action in {"help", "?"}:
+            yield event.plain_result(usage)
+            return
+        admin_only = {"add", "del", "pending", "approve", "reject"}
+        if action in admin_only and not event.is_admin():
+            yield event.plain_result("这个别名管理操作需要 AstrBot 管理员权限。")
+            return
+
+        try:
+            if action in {"add", "submit"}:
+                if not alias or not title:
+                    raise AliasError(usage)
+                target = await self._resolve_alias_target(title)
+                # A real title always takes precedence over an alias in search.
+                if alias_key(alias) in {
+                    alias_key(entry["title"])
+                    for entry in self.constant_table_manager.entries
+                }:
+                    raise AliasError("这个别名与已有歌曲的完整曲名冲突。")
+                if action == "add":
+                    self.alias_manager.add(alias, target)
+                    yield event.plain_result(f"已添加别名：{alias} → {target}（立即生效）")
+                else:
+                    request_id = self.alias_manager.submit(
+                        alias, target, event.get_platform_name(), event.get_sender_id()
+                    )
+                    yield event.plain_result(
+                        f"别名申请 #{request_id} 已提交：{alias} → {target}，等待管理员审核。"
+                    )
+            elif action == "del":
+                if not alias:
+                    raise AliasError(usage)
+                old_target = self.alias_manager.delete(alias)
+                yield event.plain_result(f"已删除别名：{alias} → {old_target}（立即生效）")
+            elif action == "list":
+                matches = self.alias_manager.list_aliases(alias)
+                if not matches:
+                    yield event.plain_result("没有匹配的别名。")
+                    return
+                lines = [f"别名库共找到 {len(matches)} 条："]
+                lines += [f"{key} → {value}" for key, value in matches[:30]]
+                if len(matches) > 30:
+                    lines.append(f"……还有 {len(matches) - 30} 条，请缩小关键词。")
+                yield event.plain_result("\n".join(lines))
+            elif action == "pending":
+                pending = self.alias_manager.pending()
+                if not pending:
+                    yield event.plain_result("目前没有待审别名。")
+                    return
+                lines = [f"待审别名共 {len(pending)} 条："]
+                lines += [
+                    f"#{item['id']} {item['alias']} → {item['title']} "
+                    f"({item['platform']}:{item['sender']})"
+                    for item in pending[:30]
+                ]
+                if len(pending) > 30:
+                    lines.append(f"……还有 {len(pending) - 30} 条。")
+                yield event.plain_result("\n".join(lines))
+            elif action in {"approve", "reject"}:
+                if not alias.isdecimal():
+                    raise AliasError("请提供待审申请编号，例如 /mai alias approve 1")
+                request_id = int(alias)
+                if action == "approve":
+                    request = self.alias_manager.get_request(request_id)
+                    # Revalidate: table selection and upstream songs may change.
+                    target = await self._resolve_alias_target(request["title"])
+                    if alias_key(request["alias"]) in {
+                        alias_key(entry["title"])
+                        for entry in self.constant_table_manager.entries
+                    }:
+                        raise AliasError("申请别名与当前歌曲完整曲名冲突。")
+                    request["title"] = target
+                    self.alias_manager.approve(request_id)
+                    yield event.plain_result(
+                        f"已通过 #{request_id}：{request['alias']} → {target}（立即生效）"
+                    )
+                else:
+                    request = self.alias_manager.reject(request_id)
+                    yield event.plain_result(
+                        f"已拒绝 #{request_id}：{request['alias']} → {request['title']}"
+                    )
+            else:
+                yield event.plain_result(usage)
+        except AliasError as exc:
+            yield event.plain_result(str(exc))
+        except (OSError, ValueError) as exc:
+            logger.error("Alias command failed: %s", exc, exc_info=True)
+            yield event.plain_result(f"别名操作失败：{exc}")
 
     @mai.command("search", alias={"搜索"})
     async def mai_search(self, event: AstrMessageEvent, keyword: str = ""):
