@@ -33,7 +33,7 @@ Python依赖会由Astrbot自动依照开发者提供的`requirements.txt`管理
 - `/mai bind <服务器> <好友码>` / `/mai 绑定 <服务器> <好友码>`：绑定好友码。
 - `/mai unbind [服务器]` / `/mai 解绑 [服务器]`：解绑当前平台上的好友码；不填服务器时解绑当前平台下全部记录。
 - `/mai search <关键词>` / `/mai 搜索 <关键词>`：按完整标题、别名或版本搜索歌曲与定数。
-- `/mai alias submit <别名> "<完整曲名>"`：用户提交别名申请；`/mai alias list [关键词]`：查看实例别名。
+- `/mai alias submit <别名> <完整曲名>`：用户提交别名申请；`/mai alias list [关键词]`：查看实例别名。
 - `/mai alias add/del/pending/approve/reject`：管理员添加、删除和审核别名（`/mai alias help` 查看格式）。
 - `/mai view-all-binds [--force|-f]`：管理员查看全部绑定；默认仅允许私聊中使用。
 - `/mai reload-constant-table [JP|INT]`：管理员强制刷新定数表，并可顺便切换表版本。
@@ -108,7 +108,7 @@ Python依赖会由Astrbot自动依照开发者提供的`requirements.txt`管理
 
 首次启动时会自动在 `data/plugin_data/astrbot_plugin_maib50/title_aliases.json` 创建空对象 `{}`，已有文件则直接读取，绝不覆盖。仓库不再附带别名库；升级到 1.3.1 **不会自动复制或迁移**旧插件目录中的别名。如需保留 v1.3.0 的自定义内容，请在更新前手动备份并放入插件数据目录。别名库中的保存格式为 `"别名": "定数表内的完整曲名"`。
 
-用户可提交 `/mai alias submit ieo "INFiNiTE ENERZY -Overdoze-"`；管理员使用 `/mai alias pending`、`/mai alias approve <编号>` 或 `/mai alias reject <编号>` 审核，也可用 `/mai alias add <别名> "<完整曲名>"` 直接添加、`/mai alias del <别名>` 删除。完整曲名含空格时可直接输入，也可用成对引号括起来。批准/添加后立即写入数据目录并更新内存索引，**无需重载插件**；手动直接编辑 JSON 后仍需重载才会重新读取。
+用户可提交 `/mai alias submit ieo INFiNiTE ENERZY -Overdoze-`；管理员使用 `/mai alias pending`、`/mai alias approve <编号>` 或 `/mai alias reject <编号>` 审核，也可用 `/mai alias add <别名> <完整曲名>` 直接添加、`/mai alias del <别名>` 删除。完整曲名含空格时可直接输入，也可用成对引号括起来。批准/添加后立即写入数据目录并更新内存索引，**无需重载插件**；手动直接编辑 JSON 后仍需重载才会重新读取。
 
 ## 图片渲染
 

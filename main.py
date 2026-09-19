@@ -13,6 +13,7 @@ import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star
+from astrbot.core.star.filter.command import GreedyStr
 from astrbot.core.utils.astrbot_path import (
     get_astrbot_plugin_data_path,
     get_astrbot_plugin_path,
@@ -980,19 +981,17 @@ MUNET munet MuNET""")
         event: AstrMessageEvent,
         action: str = "",
         alias: str = "",
+        title: GreedyStr = "",
     ):
         """Instance-local alias submission and administration."""
-        # AstrBot splits command arguments on whitespace and ignores quotes.
-        # Read the remaining message directly, so multiword song titles work.
-        parts = event.get_message_str().strip().split(maxsplit=4)
-        title = parts[4].strip() if len(parts) > 4 else ""
+        title = title.strip()
         if len(title) >= 2 and title[0] == title[-1] and title[0] in ("'", '"'):
             title = title[1:-1]
         usage = (
             '用法：\n'
-            '/mai alias submit <别名> "<完整曲名>"（用户提交申请）\n'
+            '/mai alias submit <别名> <完整曲名>（用户提交申请）\n'
             '/mai alias list [关键词]\n'
-            '/mai alias add <别名> "<完整曲名>"（管理员直接添加）\n'
+            '/mai alias add <别名> <完整曲名>（管理员直接添加）\n'
             '/mai alias del <别名>（管理员删除）\n'
             '/mai alias pending（管理员查看待审）\n'
             '/mai alias approve <编号> / reject <编号>（管理员审核）'
@@ -1069,7 +1068,6 @@ MUNET munet MuNET""")
                         for entry in self.constant_table_manager.entries
                     }:
                         raise AliasError("申请别名与当前歌曲完整曲名冲突。")
-                    request["title"] = target
                     self.alias_manager.approve(request_id)
                     yield event.plain_result(
                         f"已通过 #{request_id}：{request['alias']} → {target}（立即生效）"

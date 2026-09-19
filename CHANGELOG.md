@@ -5,7 +5,7 @@
 ### 修复与功能 / Fixes and features
 
 - 删除仓库内的 `title_aliases.json`，在插件数据目录首次启动时创建空别名库；已有实例 JSON 不覆盖、不自动迁移旧文件。
-- 别名管理拆分为 `alias_manager.py`，在内存索引查询，添加/审核通过后即时生效；JSON 原子写入；支持空格曲名的完整参数读取。
+- 别名管理拆分为 `alias_manager.py`，在内存索引查询，添加/审核通过后即时生效；JSON 原子写入；使用 AstrBot `GreedyStr` 接收含空格的完整曲名。
 - 支持多个别名指向同一歌曲、冲突检查、用户提交与管理员审核/直接增删。
 - Removed bundled aliases; initialize empty instance-local JSON and preserve existing files without migration.
 - Added in-memory alias indexing, immediate updates, moderation commands, duplicate checks and atomic persistence.
