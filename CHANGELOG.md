@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.0 (2026-09-19)
+
+### 增加功能 / Added feature
+
+- `/mai search` 支持通过 `title_aliases.json` 查询歌曲别名，包括玩家简称和特殊字符兼容映射（例如 `ieo`、`最水15`、`RONDO`）。
+- 歌曲完整标题和别名优先匹配；未找到时保留原有的标题与版本模糊搜索。
+- 别名查询支持英文字母大小写、Unicode 和空白字符规范化；保留原有异名映射。
+- Added community song aliases to `/mai search`, reusing `title_aliases.json` for both nicknames and title compatibility mappings.
+- Prioritized exact-title and alias matches, retained substring title/version search as fallback, and normalized alias input.
+
 ## 1.2.0 (2026-05-22)
 
 ### 修复 / Fix
