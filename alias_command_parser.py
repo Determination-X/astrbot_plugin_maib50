@@ -31,7 +31,12 @@ def parse_alias_command(arguments: str) -> tuple[str, str, str]:
     if action == "list" and title:
         alias = f"{alias} {title}"
         title = ""
-    elif len(title) >= 2 and title[0] == title[-1] and title[0] in ("'", '"'):
-        title = title[1:-1]
 
     return action, alias, title
+
+
+def song_title_candidates(title: str) -> tuple[str, ...]:
+    """Try a literal title first, then optionally remove paired input quotes."""
+    if len(title) >= 2 and title[0] == title[-1] and title[0] in ("'", '"'):
+        return title, title[1:-1]
+    return (title,)
