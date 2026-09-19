@@ -31,8 +31,26 @@ class AliasCommandParserTests(unittest.TestCase):
         )
         self.assertEqual(
             parse_alias_command('add dsr "DON\'T STOP ROCKIN\'"'),
-            ("add", "dsr", "DON'T STOP ROCKIN'"),
+            ("add", "dsr", '"DON\'T STOP ROCKIN\'"'),
         )
+
+    def test_literal_paired_quotes_in_titles_are_not_lost(self):
+        self.assertEqual(
+            parse_alias_command("add literal 'Title'"),
+            ("add", "literal", "'Title'"),
+        )
+        self.assertEqual(
+            parse_alias_command('add literal "Title"'),
+            ("add", "literal", '"Title"'),
+        )
+
+    def test_literal_title_is_prioritized_over_unquoted_fallback(self):
+        from alias_command_parser import song_title_candidates
+
+        self.assertEqual(song_title_candidates("'Title'"), ("'Title'", "Title"))
+        self.assertEqual(song_title_candidates('"Title"'), ('"Title"', "Title"))
+        self.assertEqual(song_title_candidates("DON'T STOP ROCKIN'"), ("DON'T STOP ROCKIN'",))
+        self.assertEqual(song_title_candidates('"DON\'T STOP ROCKIN\'"'), ('"DON\'T STOP ROCKIN\'"', "DON'T STOP ROCKIN'"))
 
     def test_list_and_delete_quoted_alias(self):
         self.assertEqual(

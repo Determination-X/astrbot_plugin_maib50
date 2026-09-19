@@ -19,7 +19,7 @@ from astrbot.core.utils.astrbot_path import (
     get_astrbot_plugin_path,
 )
 
-from .alias_command_parser import parse_alias_command
+from .alias_command_parser import parse_alias_command, song_title_candidates
 from .alias_manager import AliasError, AliasManager, alias_key
 from .ap50 import AP50Helper
 from .b50 import B50Helper
@@ -963,11 +963,15 @@ MUNET munet MuNET""")
         async with aiohttp.ClientSession() as session:
             await self._ensure_constant_table_loaded(session)
         manager = self.constant_table_manager
-        matches = manager._title_index.get(requested_title, [])
-        if not matches:
-            key = manager._normalize_title(requested_title)
-            matches = manager._normalized_title_index.get(key, [])
-        titles = {entry["title"] for entry in matches}
+        titles = set()
+        for candidate in song_title_candidates(requested_title):
+            matches = manager._title_index.get(candidate, [])
+            if not matches:
+                key = manager._normalize_title(candidate)
+                matches = manager._normalized_title_index.get(key, [])
+            titles = {entry["title"] for entry in matches}
+            if titles:
+                break
         if not titles:
             raise AliasError(
                 "目标曲名不在当前定数表中；请使用完整曲名，不支持用另一个别名作为目标。"

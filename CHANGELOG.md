@@ -8,6 +8,7 @@
 - 别名管理拆分为 `alias_manager.py`，在内存索引查询，添加/审核通过后即时生效；JSON 原子写入；使用 AstrBot `GreedyStr` 接收含空格的完整曲名。
 - 支持多个别名指向同一歌曲、冲突检查、用户提交与管理员审核/直接增删；多词别名使用双引号明确参数边界，不再把曲名或别名中的单引号当作 shell 引号。
 - 修复定数表刷新时缺少 `json` 导入导致首次读取失败的问题。
+- 保留歌曲名称首尾本身存在的引号；只有原样匹配不到时才尝试去除输入时的包裹引号。
 - Removed bundled aliases; initialize empty instance-local JSON and preserve existing files without migration.
 - Added in-memory alias indexing, immediate updates, moderation commands, duplicate checks and atomic persistence.
 
