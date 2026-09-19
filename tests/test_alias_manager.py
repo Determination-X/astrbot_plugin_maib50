@@ -44,7 +44,7 @@ class AliasManagerTests(unittest.TestCase):
         self.assertEqual(manager.pending()[0]["id"], request_id)
         with self.assertRaises(AliasError):
             manager.submit("最水15", "PANDORA PARADOXXX", "qq", "456")
-        manager.approve(request_id)
+        manager.approve(request_id, "PANDORA PARADOXXX")
         self.assertEqual(manager.get_title("最水15"), "PANDORA PARADOXXX")
         self.assertEqual(manager.pending(), [])
         self.assertEqual(AliasManager(self.data_dir).get_title("最水15"), "PANDORA PARADOXXX")

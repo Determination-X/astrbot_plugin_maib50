@@ -1068,7 +1068,7 @@ MUNET munet MuNET""")
                         for entry in self.constant_table_manager.entries
                     }:
                         raise AliasError("申请别名与当前歌曲完整曲名冲突。")
-                    self.alias_manager.approve(request_id)
+                    request = self.alias_manager.approve(request_id, target)
                     yield event.plain_result(
                         f"已通过 #{request_id}：{request['alias']} → {target}（立即生效）"
                     )

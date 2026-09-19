@@ -186,10 +186,12 @@ class AliasManager:
         })
         self._requests = updated
 
-    def approve(self, request_id: int) -> dict:
+    def approve(self, request_id: int, title: str | None = None) -> dict:
         request = self.get_request(request_id)
-        self.add(request["alias"], request["title"])
+        approved_title = title or request["title"]
+        self.add(request["alias"], approved_title)
         self._remove_request(request_id)
+        request["title"] = approved_title
         return request
 
     def reject(self, request_id: int) -> dict:
