@@ -108,7 +108,7 @@ Python依赖会由Astrbot自动依照开发者提供的`requirements.txt`管理
 
 首次启动时会自动在 `data/plugin_data/astrbot_plugin_maib50/title_aliases.json` 创建空对象 `{}`，已有文件则直接读取，绝不覆盖。仓库不再附带别名库；升级到 1.3.1 **不会自动复制或迁移**旧插件目录中的别名。如需保留 v1.3.0 的自定义内容，请在更新前手动备份并放入插件数据目录。别名库中的保存格式为 `"别名": "定数表内的完整曲名"`。
 
-用户可提交 `/mai alias submit ieo INFiNiTE ENERZY -Overdoze-`；管理员使用 `/mai alias pending`、`/mai alias approve <编号>` 或 `/mai alias reject <编号>` 审核，也可用 `/mai alias add <别名> <完整曲名>` 直接添加、`/mai alias del <别名>` 删除。完整曲名含空格时可直接输入；**别名本身含空格时必须用成对引号括起来**，例如 `/mai alias add "infinite energy overdose" INFiNiTE ENERZY -Overdoze-`。批准/添加后立即写入数据目录并更新内存索引，**无需重载插件**；手动直接编辑 JSON 后仍需重载才会重新读取。
+用户可提交 `/mai alias submit ieo INFiNiTE ENERZY -Overdoze-`；管理员使用 `/mai alias pending`、`/mai alias approve <编号>` 或 `/mai alias reject <编号>` 审核，也可用 `/mai alias add <别名> <完整曲名>` 直接添加、`/mai alias del <别名>` 删除。完整曲名含空格时可直接输入；**别名本身含空格时必须用成对双引号括起来**，例如 `/mai alias add "infinite energy overdose" INFiNiTE ENERZY -Overdoze-`。别名与曲名中的单引号（如 `don't`、`DON'T STOP ROCKIN'`）无需转义。批准/添加后立即写入数据目录并更新内存索引，**无需重载插件**；手动直接编辑 JSON 后仍需重载才会重新读取。
 
 ## 图片渲染
 
