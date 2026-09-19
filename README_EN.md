@@ -45,7 +45,7 @@ Python dependencies are automatically managed by AstrBot using the provided `req
   Unbind the friend code on the current platform. If no server is specified, all bindings on the current platform are removed.
 
 - `/mai search <keyword>` / `/mai 搜索 <keyword>`  
-  Search songs and constants in the currently loaded constant table by title or version.
+  Search songs and constants in the currently loaded constant table by title, alias, or version.
 
 - `/mai view-all-binds [--force|-f]`  
   Administrator command to view all bindings. By default, this can only be used in private chats.
@@ -125,11 +125,11 @@ Current support includes:
 - Choosing default table version (`JP` or `INT`)
 - Temporary switching and refreshing through admin command
 - Title normalization matching
-- Some known alias mappings
+- Song aliases and known title-compatibility mappings, maintained together in `title_aliases.json`
 
-If chart titles do not perfectly match the constant table, the plugin attempts to match through normalization and aliases. Unmatched charts will not be included in rating calculations.
+`/mai search` prioritizes exact song titles and aliases, then falls back to substring matching on titles or versions. Alias matching is case-insensitive for Latin letters and normalizes common Unicode and whitespace differences. Examples: `ieo` → `INFiNiTE ENERZY -Overdoze-`, `最水15` → `PANDORA PARADOXXX`, and `RONDO` → `RONDØ`.
 
-Song alias support is still under development and may integrate existing alias libraries in the future.
+To add an alias, add an entry of the form `"alias": "full song title in the constant table"` to `title_aliases.json` in the plugin directory and restart the plugin to reload it. The target song must exist in the selected INT/JP constant table: aliases do not supply songs missing from upstream data. The same mappings also help match chart titles from DX NET to the constant table for B50/AP50; unmatched charts are excluded from rating calculations.
 
 ## Image Rendering
 
@@ -311,7 +311,7 @@ If issues persist, check:
 - [x] Discord image sending compatibility
 - [ ] CN server support
 - [ ] MuNET server support
-- [ ] Alias library
+- [x] Local song alias library (`title_aliases.json`)
 - [ ] Multi-language support
 
 ## Credits
