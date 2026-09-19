@@ -984,7 +984,7 @@ MUNET munet MuNET""")
     async def mai_alias(
         self,
         event: AstrMessageEvent,
-        arguments: GreedyStr = "",
+        arguments: GreedyStr,
     ):
         """Instance-local alias submission and administration."""
         try:
