@@ -147,7 +147,18 @@ class ConstantTableManager:
         return []
 
     def _find_by_alias(self, title: str) -> list[dict[str, str]]:
-        alias_title = _load_title_aliases().get(title)
+        aliases = _load_title_aliases()
+        alias_title = aliases.get(title)
+        if not alias_title:
+            normalized_query = self._normalize_title(title).casefold()
+            alias_title = next(
+                (
+                    target
+                    for alias, target in aliases.items()
+                    if self._normalize_title(alias).casefold() == normalized_query
+                ),
+                None,
+            )
         if not alias_title:
             return []
 
