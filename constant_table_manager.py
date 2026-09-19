@@ -1,3 +1,4 @@
+import json
 import re
 
 import aiohttp
@@ -12,6 +13,8 @@ MUSIC_EX_URL = (
 MUSIC_EX_URL_INT = "https://raw.githubusercontent.com/zvuc/otoge-db/master/maimai/data/music-ex-intl.json"
 BASE_FIELDS = ("title", "version", "image_url")
 CONSTANT_FIELD_PATTERN = re.compile(r"^(?:dx_)?lev_(?:bas|adv|exp|mas|remas)_i$")
+
+
 class ConstantTableManager:
     def __init__(
         self,

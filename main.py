@@ -2,7 +2,6 @@ import os
 import pickle
 import re
 import sqlite3  # 存储绑定信息的数据库
-import shlex
 from base64 import b64encode
 from mimetypes import guess_type
 from pathlib import Path  # 用于处理文件路径
@@ -20,6 +19,7 @@ from astrbot.core.utils.astrbot_path import (
     get_astrbot_plugin_path,
 )
 
+from .alias_command_parser import parse_alias_command
 from .alias_manager import AliasError, AliasManager, alias_key
 from .ap50 import AP50Helper
 from .b50 import B50Helper
@@ -984,13 +984,10 @@ MUNET munet MuNET""")
     ):
         """Instance-local alias submission and administration."""
         try:
-            parts = shlex.split(arguments)
+            action, alias, title = parse_alias_command(arguments)
         except ValueError as exc:
             yield event.plain_result(f"别名参数格式错误：{exc}")
             return
-        action = parts[0].casefold() if parts else ""
-        alias = parts[1] if len(parts) > 1 else ""
-        title = " ".join(parts[2:]) if len(parts) > 2 else ""
         usage = (
             '用法：\n'
             '/mai alias submit <别名> <完整曲名>（多词别名请加引号）\n'
