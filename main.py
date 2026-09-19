@@ -2,6 +2,7 @@ import os
 import pickle
 import re
 import sqlite3  # 存储绑定信息的数据库
+import shlex
 from base64 import b64encode
 from mimetypes import guess_type
 from pathlib import Path  # 用于处理文件路径
@@ -979,24 +980,26 @@ MUNET munet MuNET""")
     async def mai_alias(
         self,
         event: AstrMessageEvent,
-        action: str = "",
-        alias: str = "",
-        title: GreedyStr = "",
+        arguments: GreedyStr = "",
     ):
         """Instance-local alias submission and administration."""
-        title = title.strip()
-        if len(title) >= 2 and title[0] == title[-1] and title[0] in ("'", '"'):
-            title = title[1:-1]
+        try:
+            parts = shlex.split(arguments)
+        except ValueError as exc:
+            yield event.plain_result(f"别名参数格式错误：{exc}")
+            return
+        action = parts[0].casefold() if parts else ""
+        alias = parts[1] if len(parts) > 1 else ""
+        title = " ".join(parts[2:]) if len(parts) > 2 else ""
         usage = (
             '用法：\n'
-            '/mai alias submit <别名> <完整曲名>（用户提交申请）\n'
+            '/mai alias submit <别名> <完整曲名>（多词别名请加引号）\n'
             '/mai alias list [关键词]\n'
-            '/mai alias add <别名> <完整曲名>（管理员直接添加）\n'
+            '/mai alias add <别名> <完整曲名>（多词别名请加引号）\n'
             '/mai alias del <别名>（管理员删除）\n'
             '/mai alias pending（管理员查看待审）\n'
             '/mai alias approve <编号> / reject <编号>（管理员审核）'
         )
-        action = action.casefold()
         if not action or action in {"help", "?"}:
             yield event.plain_result(usage)
             return
