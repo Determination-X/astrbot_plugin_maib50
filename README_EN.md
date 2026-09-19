@@ -135,7 +135,7 @@ Current support includes:
 
 `/mai search` prioritizes exact song titles and aliases, then falls back to title/version substring search. Alias lookups normalize case, Unicode and whitespace. Multiple aliases may point to one song, but targets must be actual song titles in the currently selected INT/JP table; aliases do not add missing upstream songs.
 
-Users can submit `/mai alias submit ieo "INFiNiTE ENERZY -Overdoze-"`. Admins may review with `/mai alias pending`, `/mai alias approve <id>`, `/mai alias reject <id>`, add directly with `/mai alias add <alias> "<full song title>"` or delete with `/mai alias del <alias>`. Quote multiword titles. Changes made through commands take effect immediately with no plugin reload; manually editing the JSON file still requires a reload.
+Users can submit `/mai alias submit ieo "INFiNiTE ENERZY -Overdoze-"`. Admins may review with `/mai alias pending`, `/mai alias approve <id>`, `/mai alias reject <id>`, add directly with `/mai alias add <alias> "<full song title>"` or delete with `/mai alias del <alias>`. Multiword titles work with or without surrounding quotes. Changes made through commands take effect immediately with no plugin reload; manually editing the JSON file still requires a reload.
 
 ## Image Rendering
 

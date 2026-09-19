@@ -980,12 +980,14 @@ MUNET munet MuNET""")
         event: AstrMessageEvent,
         action: str = "",
         alias: str = "",
-        title: str = "",
     ):
-        """Instance-local alias submission and administration.
-
-        Multiword song titles must be enclosed in quotes.
-        """
+        """Instance-local alias submission and administration."""
+        # AstrBot splits command arguments on whitespace and ignores quotes.
+        # Read the remaining message directly, so multiword song titles work.
+        parts = event.get_message_str().strip().split(maxsplit=4)
+        title = parts[4].strip() if len(parts) > 4 else ""
+        if len(title) >= 2 and title[0] == title[-1] and title[0] in ("'", '"'):
+            title = title[1:-1]
         usage = (
             '用法：\n'
             '/mai alias submit <别名> "<完整曲名>"（用户提交申请）\n'
